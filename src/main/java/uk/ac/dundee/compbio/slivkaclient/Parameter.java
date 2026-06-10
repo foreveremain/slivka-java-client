@@ -249,7 +249,7 @@ public abstract class Parameter {
       choices = new ArrayList<>();
       JSONArray arr = obj.getJSONArray("choices");
       for (Object it : arr) {
-        choices.add((String) it);
+        choices.add(it instanceof String ? (String) it: it.toString());
       }
       choices = Collections.unmodifiableList(choices);
       additionalProperties.put("choices", choices);
