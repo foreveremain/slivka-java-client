@@ -20,7 +20,7 @@ public class SlivkaFormRetrievalTest {
   @BeforeClass
   public void setUpClass() {
     HttpClientFactory.setDefaultClassName(HttpClientStub.class.getName());
-    SlivkaClient client = new SlivkaClient(slivkaUrl);
+    SlivkaClient client = SlivkaClient.newInstance(slivkaUrl);
     client.setHttpClient(httpClient);
     SlivkaService service = new SlivkaService(
         client, "mock-service", "Mock service",

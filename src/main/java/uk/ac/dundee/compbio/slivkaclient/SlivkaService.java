@@ -1,22 +1,12 @@
 package uk.ac.dundee.compbio.slivkaclient;
 
-import java.io.IOException;
 import java.net.URI;
 import java.text.ParsePosition;
-import java.util.List;
 import java.text.SimpleDateFormat;
-import java.util.AbstractMap;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
-
-import javajs.http.ClientProtocolException;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
-
-import javajs.http.HttpResponseException;
 
 public class SlivkaService {
   public static class Preset {
@@ -51,8 +41,6 @@ public class SlivkaService {
     }
   }
 
-  private final SlivkaClient client;
-
   public final URI url;
 
   public final String id;
@@ -75,12 +63,11 @@ public class SlivkaService {
 
   public final Status status;
 
-  SlivkaService(
-      SlivkaClient client, URI url, String id, String name,
+  public SlivkaService(
+      URI url, String id, String name,
       String description, String author, String version,
       String license, List<String> classifiers, List<Parameter> parameters,
       List<Preset> presets, Status status) {
-    this.client = client;
     this.id = id;
     this.url = url;
     this.name = name;
@@ -93,8 +80,6 @@ public class SlivkaService {
     this.presets = Collections.unmodifiableList(presets);
     this.status = status;
   }
-
-  public SlivkaClient getClient() { return client; }
 
   public URI getUrl() { return url; }
 
@@ -113,7 +98,7 @@ public class SlivkaService {
   public List<String> getClassifiers() { return classifiers; }
 
   public List<Parameter> getParameters() { return parameters; }
-  
+
   public Parameter getParameter(String id) {
     for (Parameter param : getParameters()) {
       if (param.id.equals(id)) {
@@ -126,36 +111,4 @@ public class SlivkaService {
   public List<Preset> getPresets() { return presets; }
 
   public Status getStatus() { return status; }
-
-  public Job submitJob(JobRequest jobRequest) throws IOException {
-    URI url = getUrl().resolve(getUrl().getPath() + "/jobs");
-    var request = client.getHttpClient().post(url);
-    for (var entry : jobRequest.getData()) {
-      request = request.addFormPart(entry.getKey(), entry.getValue());
-    }
-    for (var entry : jobRequest.getFiles()) {
-      request = request.addFilePart(entry.getKey(), entry.getValue());
-    }
-    for (var entry : jobRequest.getStreams()) {
-      request = request.addFilePart(entry.getKey(), entry.getValue());
-    }
-    var response = request.execute();
-    try (response) {
-      if (response.getStatusCode() == 202) {
-        JSONObject obj = new JSONObject(response.getText());
-        return Job.fromJSON(client, obj);
-      }
-      else if (response.getStatusCode() == 422) {
-        throw new HttpResponseException(
-            response.getStatusCode(), response.getReasonPhrase(), response.getText());
-      }
-      else {
-        throw new HttpResponseException(
-            response.getStatusCode(), response.getReasonPhrase());
-      }
-    }
-    catch (JSONException e) {
-      throw new ClientProtocolException("Unprocessable server response.", e);
-    }
-  }
 }

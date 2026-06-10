@@ -9,8 +9,10 @@ import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -24,26 +26,26 @@ import java.util.function.Function;
 
 /**
  * SwingJS implementation of javajs.http.HttpClient and associated classes.
- * 
+ *
  * Works in Java and JavaScript without any reference to org.apache.http classes.
- * 
+ *
  * Can be initialized either directly or via HttpClientFactory.getDefault().
- * 
+ *
  * For more details on HTTP methods see:
  * https://www.w3schools.com/tags/ref_httpmethods.asp
- * 
+ *
  * For more information about JavaScript FormData, see:
  * https://developer.mozilla.org/en-US/docs/Web/API/FormData/Using_FormData_Objects
- * 
+ *
  * The SimpleHttpClient is very light -- just a constructor and five methods,
  * providing limited access to HttpRequest and HttpResponse implementations.
- * 
- * 
+ *
+ *
  * @author Bob Hanson
  * @author Mateusz Warowny
- * 
+ *
  */
-class SimpleHttpClient implements HttpClient {
+public class SimpleHttpClient implements HttpClient {
 
 	SimpleHttpClient() {
 		// for reflection
@@ -79,19 +81,19 @@ class SimpleHttpClient implements HttpClient {
 
 	/**
 	 * JavaScript only.
-	 * 
+	 *
 	 * Template class implementing just two abstract methods.
-	 * 
+	 *
 	 * Added here to allow this class to be placed in Java projects without the need
 	 * to maintain the actual javajs.util.AjaxURLConnection class itself.
-	 * 
+	 *
 	 * AjaxURLConneciton is an interface with all the body methods necessary to
 	 * handle simple HTTP and HTTPS connectivity.
-	 * 
+	 *
 	 * The AjaxURLConnection class handles all the necessary work of creating
 	 * JavaScript blobs, adding them to a FormData object, and firing off a
 	 * synchronous or asynchronous jQuery.ajax() call via j2sApplet.js.
-	 * 
+	 *
 	 * @author hansonr
 	 *
 	 */
@@ -112,7 +114,7 @@ class SimpleHttpClient implements HttpClient {
 
 		/**
 		 * JavaScript SwingJS-only method, not available in Java, only JavaScript
-		 * @param whenDone 
+		 * @param whenDone
 		 */
 		// not @Override, because that method is only in SwingJS, and this class is portable
 		public abstract void getBytesAsync(Function<byte[], Void> whenDone);
@@ -164,7 +166,7 @@ class SimpleHttpClient implements HttpClient {
 
 		/**
 		 * headers, mostly ignored in SwingJS and AJAX
-		 * 
+		 *
 		 */
 		private Map<String, String> htHeaders = new HashMap<>();
 
@@ -229,16 +231,16 @@ class SimpleHttpClient implements HttpClient {
 			queryData.add(new FormData(name, value, null, null));
 			return this;
 		}
-		
+
 		@Override
 		public HttpRequest addFormPart(String name, String value) {
 			return addFormField(name, value, null, null);
 		}
 
-//		@Override
-//		public HttpRequest addFilePart(String name, String fileData, String contentType, String fileName) {
-//			return addFormField(name, fileData.getBytes(), contentType, fileName);
-//		}
+		@Override
+		public HttpRequest addFilePart(String name, String fileData, String contentType, String fileName) {
+			return addFormField(name, fileData.getBytes(), contentType, fileName);
+		}
 
 		@Override
 		public HttpRequest addFilePart(String name, File file, String contentType, String fileName) {
@@ -272,7 +274,7 @@ class SimpleHttpClient implements HttpClient {
 			}
 			return this;
 		}
-		
+
 		@Override
 		public HttpRequest clearFormParts(String name) {
 			if (formData != null) {
@@ -285,22 +287,27 @@ class SimpleHttpClient implements HttpClient {
 		}
 
 		private byte[] toBytes(Object data) {
-			try {
-				if (data == null || data instanceof byte[]) {
-				} else if (data instanceof File) {
-					FileInputStream fis = new FileInputStream((File) data);
-					data = getBytes(fis);
-					fis.close();
-				} else if (data instanceof InputStream) {
-					InputStream is = (InputStream) data;
-					data = getBytes(is);
-					is.close();
-				} else {
-					data = data.toString().getBytes();
+			if (data == null || data instanceof byte[]) {
+			  return (byte[]) data;
+			} else if (data instanceof File) {
+				try (FileInputStream fis = new FileInputStream((File) data)) {
+				  return getBytes(fis);
 				}
-			} catch (IOException e) {
+				catch (IOException e) {
+				  e.printStackTrace();
+				  return null;
+				}
+			} else if (data instanceof InputStream) {
+				try (InputStream is = (InputStream) data) {
+				  return getBytes(is);
+				}
+				catch (IOException e) {
+				  e.printStackTrace();
+				  return null;
+				}
+			} else {
+				return data.toString().getBytes();
 			}
-			return (byte[]) data;
 		}
 
 		@Override
@@ -315,6 +322,7 @@ class SimpleHttpClient implements HttpClient {
 		}
 
 		private HttpResponse executeImpl(Response r) {
+
 			Runnable runner = new Runnable() {
 
 				@Override
@@ -374,7 +382,7 @@ class SimpleHttpClient implements HttpClient {
 			sendFormData(conn, formData);
 			return r.getResponse(conn, this);
 		}
-		
+
 		@SuppressWarnings("unused")
 		private void sendFormData(HttpURLConnection conn, List<FormData> formData) throws IOException {
 			if (formData == null)
@@ -395,9 +403,9 @@ class SimpleHttpClient implements HttpClient {
 
 		/**
 		 * JavaScript only here.
-		 * 
+		 *
 		 * Create a connection that will be a javajs.util.AjaxURLConnection.
-		 * 
+		 *
 		 * @param url
 		 * @return connection
 		 * @throws IOException
@@ -424,6 +432,8 @@ class SimpleHttpClient implements HttpClient {
 
 	 class Response implements HttpResponse {
 
+		private final static int BAD_REQUEST = 400;
+
 		int state = 0;
 
 		/**
@@ -443,7 +453,7 @@ class SimpleHttpClient implements HttpClient {
 
 		/**
 		 * asynchronous callback functions
-		 * 
+		 *
 		 */
 		private Consumer<HttpResponse> succeed;
 		private BiConsumer<HttpResponse, ? super IOException> fail;
@@ -465,17 +475,17 @@ class SimpleHttpClient implements HttpClient {
 		/**
 		 * The call to get the response code, initiating a connection and possibly
 		 * throwing an UnknownHostException.
-		 * 
+		 *
 		 * (Despite the fact that URL.openConnection() has already been issued, and
 		 * despite what is in the Java JavaDoc, that call actually does not do anything
 		 * for a URLConnection. It goes as far as to create an UNRESOLVED InetSocket,
 		 * but no attempt to make an actual connection is made until getInputStream() or
 		 * getResponseCode() is called.)
-		 * 
+		 *
 		 * @param conn
-		 * @param request 
-		 * @return  Response
-		 * 
+		 * @param request
+		 * @return Response
+		 *
 		 * @throws IOException
 		 */
 		Response getResponse(HttpURLConnection conn, Request request) throws IOException {
@@ -491,43 +501,48 @@ class SimpleHttpClient implements HttpClient {
 			}
 
 			new Thread(() -> {
-					// asynchronous methods cannot throw an exception.
-					IOException exception = null;
+				// asynchronous methods cannot throw an exception.
+				IOException exception = null;
+				try {
 					if (method.equals(HttpRequest.METHOD_HEAD)) {
-						try {
-							state = conn.getResponseCode();
-						} catch (IOException e) {
-							exception = e;
-						}
-						doCallback(exception);
+						state = conn.getResponseCode();
 					} else {
-					    @SuppressWarnings("unused")
-			            Function<byte[], Void> f = new Function<byte[], Void>() {
-			
-									@Override
-									public Void apply(byte[] t) {
-										state = 400; // Bad Request?
-										try {
-											state = SimpleHttpClient.Response.this.conn.getResponseCode();
-										} catch (IOException e) {
-										}
-										doCallback(null);
-										return null;
-									}
-			
-			            };
-			            /** @j2sNative conn.getBytesAsync$java_util_function_Function(f) */
+						@SuppressWarnings("unused")
+						Function<byte[], Void> f = new Function<byte[], Void>() {
+
+							@Override
+							public Void apply(byte[] t) {
+								state = 400; // Bad Request?
+								try {
+									state = SimpleHttpClient.Response.this.conn.getResponseCode();
+									doCallback(null);
+								} catch (IOException e) {
+									doCallback(e);
+								}
+								return null;
+							}
+
+						};
+						/** @j2sNative return conn.getBytesAsync$java_util_function_Function(f); */
+						{
+							f.apply(null);
+							return;
+						}
 					}
-				
+				} catch (IOException e) {
+					exception = e;
+				}
+				doCallback(exception);
+
 			}).start();
 			return this;
 		}
 
 		/**
 		 * Make the proper callback, depending upon response code and exception state.
-		 * 
+		 *
 		 * @param ok
-		 * @param e 
+		 * @param e
 		 */
 		protected void doCallback(IOException e) {
 			boolean ok = (e == null && state < 400);
@@ -541,15 +556,17 @@ class SimpleHttpClient implements HttpClient {
 
 		/**
 		 * Handle any errors that arise in the process of processing this request.
-		 * 
+		 *
 		 * @param e
 		 * @return true if aSynchronous and has been handled
 		 */
 		protected boolean handleError(Throwable e) {
-						
+
 			if (!(e instanceof IOException)) {
 				e = new IOException(e);
 			}
+			if (e instanceof UnknownHostException)
+				state = BAD_REQUEST;
 			IOException exception = (IOException) e;
 			// setting e = null to indicated handled.
 			if (isAsync) {
@@ -593,16 +610,33 @@ class SimpleHttpClient implements HttpClient {
 
 		@Override
 		public String getText() throws IOException {
-			return new String( getBytes(getContent()));
+			return new String(getBytes(getContent()));
 		}
 
 		/**
 		 * In SwingJS, this is always a ByteArrayInputStream.
+		 * @throws IOException
 		 */
 		@Override
 		public InputStream getContent() throws IOException {
-			return (inputStream == null ? (inputStream = conn.getInputStream())
-					: inputStream);
+			if (conn == null)
+				throw new IOException("Connection could not be opened");
+			try {
+				return (inputStream == null ? (inputStream = conn.getInputStream())
+						: inputStream);
+			} catch (IOException e) {
+				if (state < 400)
+					state = decodeServerException(e.toString());
+				throw new IOException(e);
+			}
+		}
+
+		private int decodeServerException(String msg) {
+			try {
+				return Integer.parseInt(msg.substring(msg.indexOf("code:") + 5));
+			} catch (Exception e) {
+			}
+			return 404;
 		}
 
 		@Override
@@ -612,26 +646,49 @@ class SimpleHttpClient implements HttpClient {
 
 		@Override
 		public String toString() {
-			return "JSHttpClient " + method + " state=" + state + " uri=" + uri;
+			return "SimpleHttpClient " + method + " state=" + state + " uri=" + uri;
 		}
 
 	}
 
-	public static String getBytes(InputStream is) throws IOException {
-	
+	public static byte[] getBytes(InputStream is) throws IOException {
+
 		// Java 9 version is better:
-		//		 return new String(is.readAllBytes());
+		//		 return is.readAllBytes();
 
 		ByteArrayOutputStream bos = new ByteArrayOutputStream(0x4000);
 		byte[] buf = new byte[0x4000];
-		int n = 0, ntotal = 0;
+		int n = 0;
 		while((n = is.read(buf)) >= 0) {
-			ntotal += n;
 			bos.write(buf, 0, n);
-		} 
+		}
 		is.close();
-		return new String(bos.toByteArray(), 0, ntotal);
+		return bos.toByteArray();
 
+	}
+
+	public static HttpRequest createRequest(HttpClient client, String method, String url) throws IOException {
+
+		URI uri = null;
+		try {
+			uri = new URI(url);
+		} catch (URISyntaxException e) {
+			throw new IOException(e);
+		}
+		switch (method.toUpperCase()) {
+		case "HEAD":
+			return client.head(uri);
+		case "GET":
+			return client.get(uri);
+		case "POST":
+			return client.post(uri);
+		case "PUT":
+			return client.put(uri);
+		case "DELETE":
+			return client.delete(uri);
+		default:
+			throw new IOException("Unknown method:" + method);
+		}
 	}
 
 }

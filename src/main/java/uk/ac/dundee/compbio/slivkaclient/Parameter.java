@@ -32,10 +32,24 @@ public abstract class Parameter {
   public boolean isArray() { return array; }
 
   public Object getDefaultValue() { return defaultValue; }
-  
+
   public Object getDefault() { return defaultValue; }
 
   public Map<String, Object> getAdditionalProperties() { return additionalProperties; }
+
+  Parameter(String id, String name, String description, String type,
+      boolean required, boolean array, Object defaultValue,
+      Map<String, Object> additionalProperties) {
+    this();
+    this.id = id;
+    this.name = name;
+    this.description = description;
+    this.type = type;
+    this.required = required;
+    this.array = array;
+    this.defaultValue = defaultValue;
+    this.additionalProperties = additionalProperties;
+  }
 
   Parameter() {}
 
@@ -97,6 +111,16 @@ public abstract class Parameter {
     protected Integer min;
     protected Integer max;
 
+    public IntegerParameter(
+        String id, String name, String description, boolean required,
+        boolean array, Object defaultValue, Map<String, Object> additionalProperties,
+        Integer min, Integer max) {
+      super(id, name, description, "integer", required, array, defaultValue,
+          additionalProperties);
+      this.min = min;
+      this.max = max;
+    }
+
     public Integer getMin() { return min; }
 
     public Integer getMax() { return max; }
@@ -117,6 +141,18 @@ public abstract class Parameter {
     protected Double max;
     protected boolean minExclusive;
     protected boolean maxExclusive;
+
+    public DecimalParameter(
+        String id, String name, String description, boolean required,
+        boolean array, Object defaultValue, Map<String, Object> additionalProperties,
+        Double min, Double max, boolean minExclusive, boolean maxExclusive) {
+      super(id, name, description, "decimal", required, array, defaultValue,
+          additionalProperties);
+      this.min = min;
+      this.max = max;
+      this.minExclusive = minExclusive;
+      this.maxExclusive = maxExclusive;
+    }
 
     public Double getMin() { return min; }
 
@@ -156,6 +192,16 @@ public abstract class Parameter {
     protected Integer minLength;
     protected Integer maxLength;
 
+    public TextParameter(
+        String id, String name, String description, boolean required,
+        boolean array, Object defaultValue, Map<String, Object> additionalProperties,
+        Integer minLength, Integer maxLength) {
+      super(id, name, description, "text", required, array, defaultValue,
+          additionalProperties);
+      this.minLength = minLength;
+      this.maxLength = maxLength;
+    }
+
     public Integer getMinLength() { return minLength; }
 
     public Integer getMaxLength() { return maxLength; }
@@ -172,11 +218,27 @@ public abstract class Parameter {
   }
 
   public static class FlagParameter extends Parameter {
+
+    public FlagParameter(
+        String id, String name, String description, boolean required,
+        boolean array, Object defaultValue, Map<String, Object> additionalProperties) {
+      super(id, name, description, "flag", required, array, defaultValue, additionalProperties);
+    }
+
     FlagParameter() {}
   }
 
   public static class ChoiceParameter extends Parameter {
     protected List<String> choices;
+
+    public ChoiceParameter(
+        String id, String name, String description, boolean required,
+        boolean array, Object defaultValue, Map<String, Object> additionalProperties,
+        List<String> choices) {
+      super(id, name, description, "choice", required, array, defaultValue,
+          additionalProperties);
+      this.choices = choices;
+    }
 
     public List<String> getChoices() { return choices; }
 
@@ -197,6 +259,16 @@ public abstract class Parameter {
   public static class FileParameter extends Parameter {
     protected String mediaType;
     protected Map<String, String> mediaTypeParameters;
+
+    public FileParameter(
+        String id, String name, String description, boolean required,
+        boolean array, Object defaultValue, Map<String, Object> additionalProperties,
+        String mediaType, Map<String, String> mediaTypeParameters) {
+      super(id, name, description, "file", required, array, defaultValue,
+          additionalProperties);
+      this.mediaType = mediaType;
+      this.mediaTypeParameters = mediaTypeParameters;
+    }
 
     public String getMediaType() { return mediaType; }
 

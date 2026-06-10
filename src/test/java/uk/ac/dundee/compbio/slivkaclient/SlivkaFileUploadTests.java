@@ -28,7 +28,7 @@ public class SlivkaFileUploadTests {
   @BeforeClass
   public void setUpClass() throws IOException {
     HttpClientFactory.setDefaultClassName(HttpClientStub.class.getName());
-    client = new SlivkaClient(slivkaUrl);
+    client = SlivkaClient.newInstance(slivkaUrl);
     client.setHttpClient(httpClient);
     rep = new HttpClientStub.HttpResponseMock();
     rep.setStatusCode(201);
@@ -57,13 +57,13 @@ public class SlivkaFileUploadTests {
   @Test
   public void testFileUuid() throws IOException {
     var rf = client.uploadFile(filePath.toFile());
-    assertEquals(rf.getUUID(), "YaSJJBbMVOcsHRcaDSTvos");
+    assertEquals(rf.getId(), "YaSJJBbMVOcsHRcaDSTvos");
   }
 
   @Test
   public void testFileTitle() throws IOException {
     var rf = client.uploadFile(filePath.toFile());
-    assertEquals(rf.getTitle(), "filename.txt");
+    assertEquals(rf.getLabel(), "filename.txt");
   }
 
   @Test
@@ -75,13 +75,13 @@ public class SlivkaFileUploadTests {
   @Test
   public void testFileMediaType() throws IOException {
     var rf = client.uploadFile(filePath.toFile());
-    assertEquals(rf.getMimeType(), "text/plain");
+    assertEquals(rf.getMediaType(), "text/plain");
   }
 
   @Test
   public void testFileUrl() throws IOException {
     var rf = client.uploadFile(filePath.toFile());
-    assertEquals(rf.getURL(), slivkaUrl.resolve(format("api/files/%s", rf.getUUID())));
+    assertEquals(rf.getContentUrl(), slivkaUrl.resolve(format("api/files/%s", rf.getId())));
   }
 
   @Test
@@ -93,7 +93,7 @@ public class SlivkaFileUploadTests {
     rep.setContentLocation("/response/downloadable-file.txt");
     req.setResponse(rep);
     httpClient.setRequests(List.of(req));
-    var content = new String(rf.getContent().readAllBytes());
+    var content = new String(rf.getContentUrl().toURL().getContent().toString());
     assertEquals(content, "example\n");
   }
 }
