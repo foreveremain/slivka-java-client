@@ -24,7 +24,7 @@ public class SlivkaVersionTests {
   @BeforeClass
   public void setUpClass() {
     HttpClientFactory.setDefaultClassName(HttpClientStub.class.getName());
-    client = new SlivkaClient(slivkaUrl);
+    client = SlivkaClient.newInstance(slivkaUrl);
     client.setHttpClient(httpClient);
   }
 
@@ -63,8 +63,8 @@ public class SlivkaVersionTests {
   public void testVersionNumber() {
     try {
       var version = client.getVersion();
-      assertEquals(version.slivka, "0.6b3");
-      assertEquals(version.api, "1.0");
+      assertEquals(version.server, "0.6b3");
+      assertEquals(version.API, "1.0");
     } catch (IOException ioe) {
       fail("connection error", ioe);
     }

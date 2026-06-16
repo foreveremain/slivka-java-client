@@ -24,7 +24,7 @@ public class SlivkaServiceRetrievalTest {
   @BeforeClass
   public void setUpClass() {
     HttpClientFactory.setDefaultClassName(HttpClientStub.class.getName());
-    client = new SlivkaClient(slivkaUrl);
+    client = SlivkaClient.newInstance(slivkaUrl);
     client.setHttpClient(httpClient);
   }
 
@@ -77,7 +77,7 @@ public class SlivkaServiceRetrievalTest {
   public void testServiceLabel() {
     try {
       var service = client.getService("service-1");
-      assertEquals(service.getLabel(), "Service One");
+      assertEquals(service.getId(), "Service One");
     } catch (IOException ioe) {
       fail("connection error", ioe);
     }
@@ -97,7 +97,7 @@ public class SlivkaServiceRetrievalTest {
   public void testServiceUrl() {
     try {
       var service = client.getService("service-1");
-      assertEquals(service.getURL(), slivkaUrl.resolve("api/services/service-1"));
+      assertEquals(service.getUrl(), slivkaUrl.resolve("api/services/service-1"));
     } catch (IOException ioe) {
       fail("connection error", ioe);
     }
