@@ -63,8 +63,8 @@ public class SlivkaVersionTests {
   public void testVersionNumber() {
     try {
       var version = client.getVersion();
-      assertEquals(version.server, "0.6b3");
-      assertEquals(version.API, "1.0");
+      assertEquals(version.server, "0.8.3b2");
+      assertEquals(version.API, "1.1");
     } catch (IOException ioe) {
       fail("connection error", ioe);
     }

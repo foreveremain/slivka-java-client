@@ -6,8 +6,10 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -20,7 +22,7 @@ public class SlivkaFileUploadTests {
 
   SlivkaClient client = null;
   private final HttpClientStub httpClient = new HttpClientStub();
-  private static final URI slivkaUrl = URI.create("http://example.org/slivka/");
+  private static final URI slivkaUrl = URI.create("http://example.org/");
   private HttpClientStub.HttpRequestMock req = null;
   private HttpClientStub.HttpResponseMock rep = null;
   private Path filePath = null;
@@ -57,13 +59,7 @@ public class SlivkaFileUploadTests {
   @Test
   public void testFileUuid() throws IOException {
     var rf = client.uploadFile(filePath.toFile());
-    assertEquals(rf.getId(), "YaSJJBbMVOcsHRcaDSTvos");
-  }
-
-  @Test
-  public void testFileTitle() throws IOException {
-    var rf = client.uploadFile(filePath.toFile());
-    assertEquals(rf.getLabel(), "filename.txt");
+    assertEquals(rf.getId(), "ar0p2dChCPQCGyZ5");
   }
 
   @Test
@@ -75,13 +71,13 @@ public class SlivkaFileUploadTests {
   @Test
   public void testFileMediaType() throws IOException {
     var rf = client.uploadFile(filePath.toFile());
-    assertEquals(rf.getMediaType(), "text/plain");
+    assertEquals(rf.getMediaType(), "");
   }
 
   @Test
   public void testFileUrl() throws IOException {
     var rf = client.uploadFile(filePath.toFile());
-    assertEquals(rf.getContentUrl(), slivkaUrl.resolve(format("api/files/%s", rf.getId())));
+    assertEquals(rf.getUrl(), slivkaUrl.resolve(format("api/files/%s", rf.getId())));
   }
 
   @Test
@@ -93,7 +89,7 @@ public class SlivkaFileUploadTests {
     rep.setContentLocation("/response/downloadable-file.txt");
     req.setResponse(rep);
     httpClient.setRequests(List.of(req));
-    var content = new String(rf.getContentUrl().toURL().getContent().toString());
+    var content = new String(client.getFileStream(rf).readAllBytes());
     assertEquals(content, "example\n");
   }
 }

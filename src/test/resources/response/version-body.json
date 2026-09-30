@@ -1,5 +1,4 @@
 {
-  "statuscode": 200,
-  "slivka": "0.6b3",
-  "api": "1.0"
+	"APIVersion": "1.1",
+	"slivkaVersion": "0.8.3b2"
 }

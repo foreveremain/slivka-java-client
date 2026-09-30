@@ -1,21 +1,1999 @@
 {
-  "statuscode": 200,
-  "services": [
-    {
-      "name": "service-1",
-      "label": "Service One",
-      "URI": "/slivka/api/services/service-1",
-      "classifiers": [
-        "Type=test"
-      ]
-    },
-    {
-      "name": "service-2",
-      "label": "Service Two",
-      "URI": "/slivka/api/services/service-2",
-      "classifiers": [
-        "Type=test"
-      ]
-    }
-  ]
+	"services": [
+		{
+			"@url": "/slivka/api/services/example",
+			"author": "Author name",
+			"classifiers": [
+				"Topic=Example",
+				"Category=Tutorials",
+				"Show=False"
+			],
+			"description": "The service description that can even span multiple lines. It should provide all necessary details about the service and its purpose.",
+			"id": "example",
+			"license": "Apache 2.0",
+			"name": "Example Service",
+			"parameters": [
+				{
+					"array": false,
+					"default": null,
+					"description": "File whose first line is copied to the output file.",
+					"id": "input-file",
+					"name": "Input file",
+					"required": false,
+					"type": "file"
+				},
+				{
+					"array": false,
+					"default": null,
+					"description": "Some optional text.",
+					"id": "opt",
+					"maxLength": 24,
+					"name": "Text",
+					"required": false,
+					"type": "text"
+				},
+				{
+					"array": true,
+					"default": null,
+					"description": "Option that can take multiple comma-separated values. A file rep.N.txt is created for each value.",
+					"id": "rep",
+					"name": "Repeatable",
+					"required": true,
+					"type": "text"
+				},
+				{
+					"array": false,
+					"default": 0,
+					"description": "Duration the program pauses for.",
+					"id": "delay",
+					"max": 10,
+					"min": 0,
+					"name": "Sleep time",
+					"required": false,
+					"type": "integer"
+				},
+				{
+					"array": false,
+					"default": null,
+					"description": "Flag parameter that can be toggled on.",
+					"id": "flag",
+					"name": "Flag",
+					"required": false,
+					"type": "flag"
+				},
+				{
+					"array": false,
+					"default": null,
+					"description": "Required command line argument",
+					"id": "arg",
+					"name": "Text argument",
+					"required": true,
+					"type": "text"
+				}
+			],
+			"presets": [],
+			"status": {
+				"errorMessage": "",
+				"status": "UNKNOWN",
+				"timestamp": "1970-01-01T01:00:00"
+			},
+			"version": "1.3"
+		},
+		{
+			"@url": "/slivka/api/services/muscle",
+			"author": "Robert C. Edgar",
+			"classifiers": [
+				"Topic :: Computational biology :: Sequence analysis",
+				"Operation :: Analysis :: Sequence analysis :: Sequence alignment :: Multiple sequence alignment"
+			],
+			"description": "MUSCLE is one of the best-performing multiple alignment programs according to published benchmark tests, with accuracy and speed that are consistently better than CLUSTALW. MUSCLE can align hundreds of sequences in seconds. Most users learn everything they need to know about MUSCLE in a few minutes\u2014only a handful of command-line options are needed to perform common alignment tasks.",
+			"id": "muscle",
+			"license": "Public Domain",
+			"name": "MUSCLE",
+			"parameters": [
+				{
+					"array": false,
+					"default": null,
+					"description": "",
+					"id": "input",
+					"name": "Input file",
+					"required": true,
+					"type": "file"
+				},
+				{
+					"array": false,
+					"choices": [
+						"enable",
+						"disable"
+					],
+					"default": "enable",
+					"description": "Enable/disable anchor optimization in tree dependent refinement iterations",
+					"id": "anchor",
+					"name": "Anchor optimisation",
+					"required": false,
+					"type": "choice"
+				},
+				{
+					"array": false,
+					"default": false,
+					"description": "Use Steven Brenner's method for computing the root alignment.",
+					"id": "brenner",
+					"name": "Root alignment computation method",
+					"required": false,
+					"type": "flag"
+				},
+				{
+					"array": false,
+					"default": false,
+					"description": "Use dimer approximation for the SP score (faster, slightly less accurate)",
+					"id": "dimer",
+					"name": "Dimer",
+					"required": false,
+					"type": "flag"
+				},
+				{
+					"array": false,
+					"default": false,
+					"description": "Use diagonal optimizations. Faster, especially for closely related sequences, but may be less accurate.",
+					"id": "diagonal",
+					"name": "Diagonal",
+					"required": false,
+					"type": "flag"
+				},
+				{
+					"array": false,
+					"default": false,
+					"description": "Use diagonal optimizations in first iteration (faster for similar sequences)",
+					"id": "diagonal-first",
+					"name": "Diagonal 1",
+					"required": false,
+					"type": "flag"
+				},
+				{
+					"array": false,
+					"choices": [
+						"default",
+						"le",
+						"sp",
+						"sv"
+					],
+					"default": "default",
+					"description": "le - use log-expectation profile score VTML240 (default for amino acid sequences). sp - use sum-of-pairs protein profile score (PAM200).  sv - use sum-of-pairs profile score (VTML240)",
+					"id": "profile-scoring",
+					"name": "Profile scoring method",
+					"required": false,
+					"type": "choice"
+				},
+				{
+					"array": false,
+					"choices": [
+						"auto",
+						"protein",
+						"dna",
+						"rna"
+					],
+					"default": "auto",
+					"description": "Sequence type - Amino acid/Nucleotide",
+					"id": "sequence-type",
+					"name": "Sequence type",
+					"required": false,
+					"type": "choice"
+				},
+				{
+					"array": false,
+					"default": 16,
+					"description": "Maximum number of iterations (integer, default 16)",
+					"id": "maxiters",
+					"max": 100,
+					"min": 1,
+					"name": "Maxiters",
+					"required": false,
+					"type": "integer"
+				},
+				{
+					"array": false,
+					"default": 1,
+					"description": "Maximum distance between two diagonals that allows them to merge into one diagonal",
+					"id": "diagonal-break",
+					"max": 100,
+					"min": 1,
+					"name": "Diagonal break",
+					"required": false,
+					"type": "integer"
+				},
+				{
+					"array": false,
+					"default": 24,
+					"description": "Minimum length of diagonal",
+					"id": "diagonal-length",
+					"max": 100,
+					"min": 2,
+					"name": "Diagonal length",
+					"required": false,
+					"type": "integer"
+				},
+				{
+					"array": false,
+					"default": 5,
+					"description": "Discard this many positions at ends of diagonal",
+					"id": "diagonal-margin",
+					"max": 100,
+					"min": 1,
+					"name": "Diagonal margin",
+					"required": false,
+					"type": "integer"
+				},
+				{
+					"array": false,
+					"default": 32,
+					"description": "Minimum spacing between anchor columns",
+					"id": "anchor-spacing",
+					"max": 1000,
+					"min": 2,
+					"name": "Anchor spacing",
+					"required": false,
+					"type": "integer"
+				},
+				{
+					"array": false,
+					"choices": [
+						"blosum100",
+						"blosum30",
+						"blosum35",
+						"blosum40",
+						"blosum45",
+						"blosum50",
+						"blosum55",
+						"blosum60",
+						"blosum62",
+						"blosum65",
+						"blosum70",
+						"blosum75",
+						"blosum80",
+						"blosum85",
+						"blosum90",
+						"blosumn",
+						"dayhoff",
+						"gonnet",
+						"identity",
+						"match",
+						"nuc.4.2",
+						"nuc.4.4",
+						"pam10",
+						"pam100",
+						"pam110",
+						"pam120",
+						"pam130",
+						"pam140",
+						"pam150",
+						"pam160",
+						"pam170",
+						"pam180",
+						"pam190",
+						"pam20",
+						"pam200",
+						"pam210",
+						"pam220",
+						"pam230",
+						"pam240",
+						"pam250",
+						"pam260",
+						"pam270",
+						"pam280",
+						"pam290",
+						"pam30",
+						"pam300",
+						"pam310",
+						"pam320",
+						"pam330",
+						"pam340",
+						"pam350",
+						"pam360",
+						"pam370",
+						"pam380",
+						"pam390",
+						"pam40",
+						"pam400",
+						"pam410",
+						"pam420",
+						"pam430",
+						"pam440",
+						"pam450",
+						"pam460",
+						"pam470",
+						"pam480",
+						"pam490",
+						"pam50",
+						"pam500",
+						"pam60",
+						"pam70",
+						"pam80",
+						"pam90"
+					],
+					"default": "blosum62",
+					"description": "Substitution Matrix to use",
+					"id": "matrix",
+					"name": "Matrix",
+					"required": false,
+					"type": "choice"
+				},
+				{
+					"array": false,
+					"default": -12,
+					"description": "Gap opening penalty. Must be negative.",
+					"id": "gap-open",
+					"max": 0,
+					"min": -100,
+					"minExclusive": false,
+					"name": "Gap open penalty",
+					"required": false,
+					"type": "decimal"
+				},
+				{
+					"array": false,
+					"default": -1,
+					"description": "Gap extension penalty. Must be negative.",
+					"id": "gap-extension",
+					"max": 0,
+					"min": -100,
+					"minExclusive": false,
+					"name": "Gap extension penalty",
+					"required": false,
+					"type": "decimal"
+				},
+				{
+					"array": false,
+					"default": 0,
+					"description": "Center parameter. Should be negative.",
+					"id": "center",
+					"max": 0,
+					"min": -100,
+					"minExclusive": false,
+					"name": "Center",
+					"required": false,
+					"type": "decimal"
+				},
+				{
+					"array": false,
+					"default": 5,
+					"description": "Window size for determining whether a region is hydrophobic.",
+					"id": "hydro",
+					"max": 100,
+					"min": 0,
+					"name": "Hydro",
+					"required": false,
+					"type": "integer"
+				},
+				{
+					"array": false,
+					"default": 1.2,
+					"description": "Multiplier for gap open/close penalties in hydrophobic regions.",
+					"id": "hydrofactor",
+					"max": 10,
+					"maxExclusive": false,
+					"min": 0,
+					"name": "Hydrofactor",
+					"required": false,
+					"type": "decimal"
+				},
+				{
+					"array": false,
+					"default": 1.2,
+					"description": "Minimum score a column must have to be an anchor (default depends on the profile scoring function!)",
+					"id": "min-anchor-score",
+					"max": 10,
+					"maxExclusive": false,
+					"min": 0,
+					"name": "Minimum anchor score",
+					"required": false,
+					"type": "decimal"
+				},
+				{
+					"array": false,
+					"default": 1.2,
+					"description": "Minimum score a column must have to be an anchor (default depends on the profile scoring function!)",
+					"id": "min-smoothed-anchor-score",
+					"max": 10,
+					"maxExclusive": false,
+					"min": 0,
+					"name": "Minimum smoothed anchor score",
+					"required": false,
+					"type": "decimal"
+				},
+				{
+					"array": false,
+					"choices": [
+						"upgma"
+					],
+					"default": "upgma",
+					"description": "Clustering method to use on the iteration 1",
+					"id": "cluster-first",
+					"name": "Cluster1",
+					"required": false,
+					"type": "choice"
+				},
+				{
+					"array": false,
+					"choices": [
+						"upgmb",
+						"neighborjoining"
+					],
+					"default": "upgmb",
+					"description": "Clustering method to use on the interation 2 and onwards",
+					"id": "cluster-remaining",
+					"name": "Cluster2",
+					"required": false,
+					"type": "choice"
+				},
+				{
+					"array": false,
+					"choices": [
+						"none",
+						"henikoff",
+						"henikoffpb",
+						"gsc",
+						"clustalw",
+						"threeway"
+					],
+					"default": "clustalw",
+					"description": "Sequence weighting scheme to use on the iteration 1 and 2. none=all sequences have equal weight; henikoff=Henikoff &amp; Henikoff weighting scheme; henikoffpb=Modified Henikoff scheme as used in PSI-BLAST; clustalw=CLUSTALW method; threeway=Gotoh three-way method;",
+					"id": "weight-scheme-1",
+					"name": "Sequence weighting scheme 1",
+					"required": false,
+					"type": "choice"
+				},
+				{
+					"array": false,
+					"choices": [
+						"none",
+						"henikoff",
+						"henikoffpb",
+						"gsc",
+						"clustalw",
+						"threeway"
+					],
+					"default": "clustalw",
+					"description": "Sequence weighting scheme to use on the iteration 3 and all subsequent iterations for tree-dependent refinement. none=all sequences have equal weight; henikoff=Henikoff &amp; Henikoff weighting scheme; henikoffpb=Modified Henikoff scheme as used in PSI-BLAST; clustalw=CLUSTALW method; threeway=Gotoh three-way method",
+					"id": "weight-scheme-2",
+					"name": "Sequence weighting scheme 2",
+					"required": false,
+					"type": "choice"
+				},
+				{
+					"array": false,
+					"choices": [
+						"kmer6_6",
+						"kmer20_3",
+						"kbit20_3",
+						"kmer20_4",
+						"kmer4_6"
+					],
+					"default": "kmer6_6",
+					"description": "Distance measure for iteration 1. Defaults Kmer6_6 (for amino ) or Kmer4_6 (for nucleo)",
+					"id": "distance1",
+					"name": "Distance1",
+					"required": false,
+					"type": "choice"
+				}
+			],
+			"presets": [],
+			"status": {
+				"errorMessage": "",
+				"status": "OK",
+				"timestamp": "2026-09-30T12:59:05"
+			},
+			"version": "3.8.1551"
+		},
+		{
+			"@url": "/slivka/api/services/globplot",
+			"author": "Rune Linding",
+			"classifiers": [
+				"Topic :: Computational biology :: Sequence analysis",
+				"Operation :: Analysis :: Sequence analysis :: Protein sequence analysis"
+			],
+			"description": "",
+			"id": "globplot",
+			"license": "Academic Free License version 1.2",
+			"name": "GlobPlot",
+			"parameters": [
+				{
+					"array": false,
+					"default": null,
+					"description": "",
+					"id": "input",
+					"mediaType": "application/fasta",
+					"mediaTypeParameters": {},
+					"mimetype": "application/fasta",
+					"name": "Input file",
+					"required": true,
+					"type": "file"
+				}
+			],
+			"presets": [],
+			"status": {
+				"errorMessage": "",
+				"status": "OK",
+				"timestamp": "2026-09-30T12:59:05"
+			},
+			"version": "2.3"
+		},
+		{
+			"@url": "/slivka/api/services/jronn",
+			"author": "Peter Troshin",
+			"classifiers": [
+				"Topic :: Computational biology :: Sequence analysis",
+				"Operation :: Analysis :: Sequence analysis :: Protein sequence analysis"
+			],
+			"description": "JRONN is a Java implementation of RONN. JRONN is based on RONN and uses the same model data, therefore gives the same predictions. Main motivation behind JRONN development was providing an implementation of RONN more suitable to use by the automated analysis pipelines and web services. Original version of RONN is described in Yang,Z.R., Thomson,R., McMeil,P. and Esnouf,R.M. (2005) RONN: the bio-basis function neural network technique applied to the detection of natively disordered regions in proteins Bioinformatics 21: 3369-3376 See also http://www.strubi.ox.ac.uk/RONN",
+			"id": "jronn",
+			"license": "Apache 2.0",
+			"name": "Jronn",
+			"parameters": [
+				{
+					"array": false,
+					"default": null,
+					"description": "",
+					"id": "input",
+					"mediaType": "application/fasta",
+					"mediaTypeParameters": {},
+					"mimetype": "application/fasta",
+					"name": "Input file",
+					"required": true,
+					"type": "file"
+				}
+			],
+			"presets": [],
+			"status": {
+				"errorMessage": "",
+				"status": "OK",
+				"timestamp": "2026-09-30T12:59:07"
+			},
+			"version": "3.1b"
+		},
+		{
+			"@url": "/slivka/api/services/aacon",
+			"author": "Agnieszka Golicz, Peter V. Troshin, F\u00e1bio Madeira",
+			"classifiers": [
+				"Topic :: Computational biology :: Sequence analysis",
+				"Operation :: Analysis :: Sequence analysis :: Sequence alignment analysis :: Sequence alignment analysis (conservation)",
+				"Operation :: Analysis :: Sequence analysis :: Protein sequence analysis"
+			],
+			"description": "AACon is a set of tools implementing 17 different conservation scores reviewed by Valdar as well as the more complex SMERFS algorithm for predicting protein functional sites.",
+			"id": "aacon",
+			"license": "Apache 2.0",
+			"name": "AACon",
+			"parameters": [
+				{
+					"array": false,
+					"default": null,
+					"description": "",
+					"id": "input",
+					"mediaType": "application/fasta",
+					"mediaTypeParameters": {},
+					"mimetype": "application/fasta",
+					"name": "Input file",
+					"required": true,
+					"type": "file"
+				},
+				{
+					"array": false,
+					"default": false,
+					"description": "Normalize the results. Normalized results have values between 0 and 1. Please note however, that some results cannot be normalized. In such a case, the system returns not normalized value. The following formula is used for normalization n = (d - dmin)/(dmax - dmin). Negative results first converted to positive by adding a greatest absolute result value.",
+					"id": "normalize",
+					"name": "Normalize",
+					"required": false,
+					"type": "flag"
+				},
+				{
+					"array": true,
+					"choices": [
+						"kabat",
+						"jores",
+						"schneider",
+						"shenkin",
+						"gerstein",
+						"taylor gaps",
+						"taylor no gaps",
+						"zvelibil",
+						"karlin",
+						"armon",
+						"thompson",
+						"not lancet",
+						"mirny",
+						"williamson",
+						"landgraf",
+						"sander",
+						"valdar",
+						"smerfs"
+					],
+					"default": [
+						"shenkin"
+					],
+					"description": "The method of the calculation to use",
+					"id": "method",
+					"name": "Calculation method",
+					"required": false,
+					"type": "choice"
+				},
+				{
+					"array": false,
+					"default": 7,
+					"description": "The width of the window for SMERFS. Optional, defaults to 7",
+					"id": "smerfsww",
+					"max": 100,
+					"min": 3,
+					"name": "SMERFS Window Width",
+					"required": false,
+					"type": "integer"
+				},
+				{
+					"array": false,
+					"choices": [
+						"max score",
+						"mid score"
+					],
+					"default": "mid score",
+					"description": "SMERFS Column Score algorithm defines the window scores to columns allocation, two methods are possible: MID_SCORE - gives the window score to the middle column, MAX_SCORE - gives the column the highest score of all the windows it belongs to. Optional, defaults to MID_SCORE.",
+					"id": "smerfscs",
+					"name": "SMERFS Column Scoring Method",
+					"required": false,
+					"type": "choice"
+				},
+				{
+					"array": false,
+					"default": 0.1,
+					"description": "a gap percentage cutoff - a float greater than 0 and smaller or equal 1.  Optional, defaults to 0.1",
+					"id": "smerfsgt",
+					"max": 1,
+					"maxExclusive": false,
+					"min": 0.001,
+					"minExclusive": false,
+					"name": "SMERFS Gap Threshhold",
+					"required": false,
+					"type": "decimal"
+				}
+			],
+			"presets": [],
+			"status": {
+				"errorMessage": "",
+				"status": "OK",
+				"timestamp": "2026-09-30T12:59:07"
+			},
+			"version": "1.1"
+		},
+		{
+			"@url": "/slivka/api/services/tcoffee",
+			"author": "Cedric Notredame",
+			"classifiers": [
+				"Topic :: Computational biology :: Sequence analysis",
+				"Operation :: Analysis :: Sequence analysis :: Sequence alignment :: Multiple sequence alignment"
+			],
+			"description": "T-Coffee (Tree-based Consistency Objective Function for Alignment Evaluation) is a multiple sequence alignment software using a progressive approach. It generates a library of pairwise alignments to guide the multiple sequence alignment.",
+			"id": "tcoffee",
+			"license": "GNU GPL",
+			"name": "TCoffee",
+			"parameters": [
+				{
+					"array": false,
+					"default": null,
+					"description": "",
+					"id": "sequence",
+					"mediaType": "application/fasta",
+					"mediaTypeParameters": {},
+					"mimetype": "application/fasta",
+					"name": "input sequence file",
+					"required": true,
+					"type": "file"
+				},
+				{
+					"array": false,
+					"default": false,
+					"description": "Forces t_coffee to run extract_from_pdb to check the pdb status of each sequence. This can considerably slow down the program.",
+					"id": "check-pdb-status",
+					"name": "Search sequences in PDB",
+					"required": false,
+					"type": "flag"
+				},
+				{
+					"array": false,
+					"choices": [
+						"quickaln"
+					],
+					"default": "quickaln",
+					"description": "It indicates that t_coffee will use some hard coded parameters. These include: quickaln: Very fast, sequence type - all, accuracy - medium low",
+					"id": "mode",
+					"name": "Preset Mode",
+					"required": false,
+					"type": "choice"
+				},
+				{
+					"array": false,
+					"choices": [
+						"slow",
+						"fast",
+						"very fast",
+						"ktup",
+						"aln"
+					],
+					"default": "very fast",
+					"description": "This flag indicates the method used for computing the distance matrix (distance between every pair of sequences) required for the computation of the dendrogram. Slow   The chosen dp_mode using the extended library, fast:   The fasta dp_mode using the extended library; very_fast: The fasta dp_mode using blosum62mt; ktup: Ktup matching (Muscle kind); aln: Read the distances on a precomputed MSA",
+					"id": "distance-matrix-mode",
+					"name": "Distance matrix computation method",
+					"required": false,
+					"type": "choice"
+				},
+				{
+					"array": false,
+					"choices": [
+						"gotoh pair-wise",
+						"myers-miller pair-wise",
+						"fasta pair-wise",
+						"cfasta pair-wise"
+					],
+					"default": "cfasta pair-wise",
+					"description": "gotoh_pair_wise: implementation of the gotoh algorithm (quadratic in memory and time); myers_miller_pair_wise: implementation of the Myers and Miller dynamic programming algorithm ( quadratic in time and linear in space). This algorithm is recommended for very long sequences. It is about 2 times slower than gotoh and only accepts tg_mode=1or 2 (i.e. gaps penalized for opening); fasta_pair_wise: implementation of the fasta algorithm. The sequence is hashed, looking for ktuples words. Dynamic programming is only carried out on the ndiag best scoring diagonals. This is much faster but less accurate than the two previous. This mode is controlled by the parameters -ktuple, -diag_mode and -ndiag; cfasta_pair_wise: c stands for checked. It is the same algorithm. The dynamic programming is made on the ndiag best diagonals, and then on the 2*ndiags, and so on until the scores converge. Complexity will depend on the level of divergence of the sequences, but will usually be L*log(L), with an accuracy comparable to the two first mode ( this was checked on BaliBase). This mode is controlled by the parameters -ktuple, -diag_mode and -ndiag",
+					"id": "dp-mode",
+					"name": "Tree Computation method",
+					"required": false,
+					"type": "choice"
+				},
+				{
+					"array": false,
+					"default": 0,
+					"description": "Indicates the number of diagonals used by the fasta_pair_wise algorithm (cf -dp_mode). When  -ndiag=0, n_diag=Log (length of the smallest sequence)+1.  When -ndiag and -diag_threshold are set, diagonals are selected if and only if they fulfill both conditions.",
+					"id": "ndiag",
+					"max": 1000,
+					"min": 0,
+					"name": "Number of diagonals used by the fasta_pair_wise algorithm",
+					"required": false,
+					"type": "integer"
+				},
+				{
+					"array": false,
+					"choices": [
+						"0",
+						"1"
+					],
+					"default": "0",
+					"description": "Indicates the manner in which diagonals are scored during the fasta hashing. 0: indicates that the score of a diagonal is equal to the sum of the scores of the exact matches it contains. 1: indicates that this score is set equal to the score of the best uninterrupted segment (useful when dealing with fragments of sequences).",
+					"id": "diag-mode",
+					"name": "Number of diagonals used by the fasta pair-wise algorithm",
+					"required": false,
+					"type": "choice"
+				},
+				{
+					"array": false,
+					"default": 0,
+					"description": "Sets the value of the threshold when selecting diagonals. 0: indicates that -ndiag should be used to select the diagonals (cf -ndiag section).",
+					"id": "diag-threshold",
+					"max": 1000,
+					"min": 0,
+					"name": "Diagonal threshold",
+					"required": false,
+					"type": "integer"
+				},
+				{
+					"array": false,
+					"choices": [
+						"vasiliky",
+						"idmat"
+					],
+					"default": "vasiliky",
+					"description": "Indicates the manner in which the amino acid alphabet is degenerated when hashing in the fasta_pairwise dynamic programming. Standard ClustalW matrices are all valid.  They are used to define groups of amino acids having positive substitution values.  In T-Coffee, the default is a 13 letter grouping named Vasiliky, with residues grouped as follows: rk, de, qh, vilm, fy (other residues kept alone).  This alphabet is set with the flag -sim_matrix=vasiliky.  In order to keep the alphabet non degenerated, -sim_matrix=idmat can be used to retain the standard alphabet.",
+					"id": "sim-matrix",
+					"name": "Alphabet degeneration method",
+					"required": false,
+					"type": "choice"
+				},
+				{
+					"array": false,
+					"choices": [
+						"blosum62mt"
+					],
+					"default": "blosum62mt",
+					"description": "This flag sets the matrix that will be used by alignment methods within t_coffee (slow_pair, lalign_id_pair). It does not affect external methods (like clustal_pair, clustal_aln). Users can also provide their own matrices, using the matrix format described in the appendix.",
+					"id": "matrix",
+					"name": "Substitution Matrix",
+					"required": false,
+					"type": "choice"
+				},
+				{
+					"array": false,
+					"default": 0,
+					"description": "Indicates the penalty to associate with a match. When using a library, all matches are positive or equal to 0. Matches equal to 0 are unsupported by the library but non-penalized. Setting nomatch to a non-negative value makes it possible to penalize these null matches and prevent unrelated sequences from being aligned (this can be useful when the alignments are meant to be used for structural modeling)",
+					"id": "match-penalty",
+					"max": 1000,
+					"min": 0,
+					"name": "Match penalty",
+					"required": false,
+					"type": "integer"
+				},
+				{
+					"array": false,
+					"default": 0,
+					"description": "Indicates the penalty applied for opening a gap. The penalty must be negative.  If no value is provided when using a substitution matrix, a value will be automatically computed. Here are some guidelines regarding the tuning of gapopen and gapext. In T-Coffee matches get a score between 0 (match) and 1000 (match perfectly consistent with the library). The default cosmetic penalty is set to -50 (5% of a perfect match). If you want to tune -gapoen and see a strong effect, you should therefore consider values between 0 and -1000.",
+					"id": "gap-open",
+					"max": 0,
+					"min": -1000,
+					"name": "Gap opening penalty",
+					"required": false,
+					"type": "integer"
+				},
+				{
+					"array": false,
+					"default": 0,
+					"description": "Indicates the penalty applied for extending a gap. The penalty must be negative.",
+					"id": "gap-ext",
+					"max": 0,
+					"min": -1000,
+					"name": "Gap extension penalty",
+					"required": false,
+					"type": "integer"
+				},
+				{
+					"array": false,
+					"default": -50,
+					"description": "Indicates the penalty applied for opening a gap. The penalty must be negative and is set to a very low value by default. It will only have an influence on the portions of the alignment that are unalignable.  It will not make them more correct, but only more pleasing to the eye (i.e. Avoid stretches of lonely residues). The cosmetic penalty is automatically turned off if a substitution matrix is used rather than a library.",
+					"id": "cosmetic-penalty",
+					"max": 0,
+					"min": -1000,
+					"name": "Cosmetic penalty",
+					"required": false,
+					"type": "integer"
+				},
+				{
+					"array": false,
+					"choices": [
+						"0",
+						"1",
+						"2"
+					],
+					"default": "1",
+					"description": "0: terminal gaps penalized with -gapopen + -gapext*len; 1: terminal gaps penalized with a -gapext*len; 2: terminal gaps unpenalized.",
+					"id": "tg-mode",
+					"name": "Terminal gaps penalty",
+					"required": false,
+					"type": "choice"
+				},
+				{
+					"array": false,
+					"default": 0,
+					"description": "Sequences are extracted in turn and realigned to the MSA.  If iterate is set to -1, each sequence is realigned, otherwise the number of iterations is set by -iterate.",
+					"id": "iterate",
+					"max": 100,
+					"min": -1,
+					"name": "Number of iterations",
+					"required": false,
+					"type": "integer"
+				},
+				{
+					"array": false,
+					"choices": [
+						"input",
+						"aligned"
+					],
+					"default": "input",
+					"description": "Sets the order of the sequences in the output alignment: -outorder=input means the sequences are kept in the original order. -outorder=aligned means the sequences come in the order indicated by the tree. This order can be seen as a one-dimensional projection of the tree distances.",
+					"id": "outorder",
+					"name": "Output order",
+					"required": false,
+					"type": "choice"
+				},
+				{
+					"array": false,
+					"choices": [
+						"input",
+						"aligned"
+					],
+					"default": "input",
+					"description": "Multiple alignments based on dynamic programming depend slightly on the order in which the incoming sequences are provided. To prevent this effect sequences are arbitrarily sorted at the beginning of the program (-inorder=aligned). However, this affects the sequence order within the library. You can switch this off by setting -inorder=input",
+					"id": "inorder",
+					"name": "Input order",
+					"required": false,
+					"type": "choice"
+				}
+			],
+			"presets": [],
+			"status": {
+				"errorMessage": "",
+				"status": "OK",
+				"timestamp": "2026-09-30T12:59:09"
+			},
+			"version": "13.41.0.28bdc39"
+		},
+		{
+			"@url": "/slivka/api/services/mafft",
+			"author": "Kazutaka Katoh",
+			"classifiers": [
+				"Topic :: Computational biology :: Sequence analysis",
+				"Operation :: Analysis :: Sequence analysis :: Sequence alignment :: Multiple sequence alignment"
+			],
+			"description": "MAFFT is a multiple sequence alignment program for unix-like operating systems.  It offers a range of multiple alignment methods, L-INS-i, FFT-NS-2, etc.",
+			"id": "mafft",
+			"license": "BSD",
+			"name": "MAFFT",
+			"parameters": [
+				{
+					"array": false,
+					"default": null,
+					"description": "",
+					"id": "input",
+					"mediaType": "application/fasta",
+					"mediaTypeParameters": {},
+					"mimetype": "application/fasta",
+					"name": "Input file",
+					"required": true,
+					"type": "file"
+				},
+				{
+					"array": false,
+					"default": true,
+					"description": "Distance is calculated based on the number of shared 6mers. Default: on",
+					"id": "6mers",
+					"name": "Shared 6mers distance calculation",
+					"required": false,
+					"type": "flag"
+				},
+				{
+					"array": false,
+					"choices": [
+						"input order",
+						"reorder"
+					],
+					"default": "input order",
+					"description": "--inputorder - Output order: same as input. --reorder - Output order: aligned. Default: same as input",
+					"id": "output-order",
+					"name": "Output sequences order",
+					"required": false,
+					"type": "choice"
+				},
+				{
+					"array": false,
+					"choices": [
+						"nucleotide",
+						"amino acid",
+						"auto"
+					],
+					"default": "auto",
+					"description": "nucleotide - Assume the sequences are nucleotide. amino acid - Assume the sequences are amino acid.",
+					"id": "sequence-type",
+					"name": "Sequence type",
+					"required": false,
+					"type": "choice"
+				},
+				{
+					"array": false,
+					"choices": [
+						"fasta",
+						"genaf",
+						"local",
+						"global"
+					],
+					"default": "local",
+					"description": "global: All pairwise alignments are computed with the Needleman-Wunsch algorithm. More accurate but slower than --6merpair. Suitable for a set of globally alignable sequences. Applicable to up to ~200 sequences. A combination with --maxiterate 1000 is recommended (G-INS-i). Default: off (6mer distance is used): genaf: All pairwise alignments are computed with a local algorithm with the generalized affine gap cost (Altschul 1998). More accurate but slower than --6merpair. Suitable when large internal gaps are expected. Applicable to up to ~200 sequences.  A combination with --maxiterate 1000 is recommended (E-INS-i).  Default: off (6mer distance is used). fasta: All pairwise alignments are computed with FASTA (Pearson and Lipman 1988). FASTA is required. Default: off (6mer distance is used). local: All pairwise alignments are computed with the Smith-Waterman algorithm.  More accurate but slower than --6merpair. Suitable for a set of locally alignable sequences. Applicable to up to ~200 sequences. A combination with --maxiterate 1000 is recommended (L-INS-i). Default: off (6mer distance is used).",
+					"id": "pairwise",
+					"name": "Pairwise alignment computation method",
+					"required": false,
+					"type": "choice"
+				},
+				{
+					"array": false,
+					"choices": [
+						"fft",
+						"no fft"
+					],
+					"default": "no fft",
+					"description": "Use / Do not use FFT approximation in group-to-group alignment. Default: off",
+					"id": "fft-approximation",
+					"name": "FFT approximation",
+					"required": false,
+					"type": "choice"
+				},
+				{
+					"array": false,
+					"default": false,
+					"description": "Alignment score is not checked in the iterative refinement stage. Default: off (score is checked)",
+					"id": "no-score",
+					"name": "No score",
+					"required": false,
+					"type": "flag"
+				},
+				{
+					"array": false,
+					"choices": [
+						"parttree",
+						"dpparttree",
+						"fastaparttree"
+					],
+					"default": "fastaparttree",
+					"description": "parttree - Use a fast tree-building method (PartTree, Katoh and Toh 2007) with the 6mer distance. dpparttree - the PartTree algorithm is used with distances based on DP. Slightly more accurate and slower than parttree. fastaparttree - The PartTree algorithm is used with distances based on FASTA. Slightly more accurate and slower than parttree. All methods recommended for a large number (> ~10,000) of sequences are input.",
+					"id": "part-tree",
+					"name": "Part tree",
+					"required": false,
+					"type": "choice"
+				},
+				{
+					"array": false,
+					"default": 0,
+					"description": "Number cycles of iterative refinement are performed. Default: 0",
+					"id": "max-iter",
+					"max": 1000,
+					"min": 0,
+					"name": "Max iteration number",
+					"required": false,
+					"type": "integer"
+				},
+				{
+					"array": false,
+					"default": 50,
+					"description": "The number of partitions in the PartTree algorithm. Default: 50",
+					"id": "partsize",
+					"max": 1000,
+					"min": 1,
+					"name": "Partsize",
+					"required": false,
+					"type": "integer"
+				},
+				{
+					"array": false,
+					"default": 20,
+					"description": "Do not make alignment larger than number sequences. Valid only with the --*parttree options. Default: the number of input sequences",
+					"id": "group-size",
+					"max": 1000,
+					"min": 0,
+					"name": "Group size",
+					"required": false,
+					"type": "integer"
+				},
+				{
+					"array": false,
+					"default": 2,
+					"description": "Guide tree is built number times in the progressive stage. Valid with 6mer distance. Default: 2",
+					"id": "retree",
+					"max": 100,
+					"min": 1,
+					"name": "Guide tree rebuild",
+					"required": false,
+					"type": "integer"
+				},
+				{
+					"array": false,
+					"default": 1.53,
+					"description": "Gap opening penalty at group-to-group alignment. Default: 1.53",
+					"id": "gap-open-penalty",
+					"max": 10,
+					"maxExclusive": false,
+					"min": 0,
+					"name": "Gap opening penalty",
+					"required": false,
+					"type": "decimal"
+				},
+				{
+					"array": false,
+					"default": 0.123,
+					"description": "Offset value, which works like gap extension penalty, for group-to-group alignment. Deafult: 0.123",
+					"id": "group-gap-ext-penalty",
+					"max": 10,
+					"maxExclusive": false,
+					"min": 0,
+					"name": "Group-to-group gap extension penalty",
+					"required": false,
+					"type": "decimal"
+				},
+				{
+					"array": false,
+					"default": -2.0,
+					"description": "Gap opening penalty at local pairwise alignment. Valid when the --localpair or --genafpair option is selected. Default: -2.00",
+					"id": "local-gap-open-penalty",
+					"max": 0,
+					"min": -10,
+					"minExclusive": false,
+					"name": "Gap opening penalty at local pairwise alignment",
+					"required": false,
+					"type": "decimal"
+				},
+				{
+					"array": false,
+					"choices": [
+						"blosum100",
+						"blosum30",
+						"blosum35",
+						"blosum40",
+						"blosum45",
+						"blosum50",
+						"blosum55",
+						"blosum60",
+						"blosum62",
+						"blosum65",
+						"blosum70",
+						"blosum75",
+						"blosum80",
+						"blosum85",
+						"blosum90",
+						"blosumn",
+						"dayhoff",
+						"gonnet",
+						"identity",
+						"match",
+						"pam10",
+						"pam100",
+						"pam110",
+						"pam120",
+						"pam130",
+						"pam140",
+						"pam150",
+						"pam160",
+						"pam170",
+						"pam180",
+						"pam190",
+						"pam20",
+						"pam200",
+						"pam210",
+						"pam220",
+						"pam230",
+						"pam240",
+						"pam250",
+						"pam260",
+						"pam270",
+						"pam280",
+						"pam290",
+						"pam30",
+						"pam300",
+						"pam310",
+						"pam320",
+						"pam330",
+						"pam340",
+						"pam350",
+						"pam360",
+						"pam370",
+						"pam380",
+						"pam390",
+						"pam40",
+						"pam400",
+						"pam410",
+						"pam420",
+						"pam430",
+						"pam440",
+						"pam450",
+						"pam460",
+						"pam470",
+						"pam480",
+						"pam490",
+						"pam50",
+						"pam500",
+						"pam60",
+						"pam70",
+						"pam80",
+						"pam90"
+					],
+					"default": "blosum62",
+					"description": "Substitution matrix to use",
+					"id": "matrix",
+					"name": "Matrix",
+					"required": false,
+					"type": "choice"
+				}
+			],
+			"presets": [],
+			"status": {
+				"errorMessage": "",
+				"status": "OK",
+				"timestamp": "2026-09-30T12:59:09"
+			},
+			"version": "7.458"
+		},
+		{
+			"@url": "/slivka/api/services/clustalo",
+			"author": "Fabian Sievers, Andreas Wilm, David Dineen, Johannes S\u00f6ding, Michael Remmert",
+			"classifiers": [
+				"Topic :: Computational biology :: Sequence analysis",
+				"Operation :: Analysis :: Sequence analysis :: Sequence alignment :: Multiple sequence alignment"
+			],
+			"description": "Clustal Omega is the latest addition to the Clustal family. It offers a significant increase in scalability over previous versions, allowing hundreds of thousands of sequences to be aligned in only a few hours. It will also make use of multiple processors, where present. In addition, the quality of alignments is superior to previous versions, as measured by a range of popular benchmarks.",
+			"id": "clustalo",
+			"license": "GNU GPL ver. 2",
+			"name": "ClustalO",
+			"parameters": [
+				{
+					"array": false,
+					"default": null,
+					"description": "",
+					"id": "input",
+					"mediaType": "application/fasta",
+					"mediaTypeParameters": {},
+					"mimetype": "application/fasta",
+					"name": "Input file",
+					"required": true,
+					"type": "file"
+				},
+				{
+					"array": false,
+					"default": false,
+					"description": "Dealign input sequences",
+					"id": "dealign",
+					"name": "Dealign",
+					"required": false,
+					"type": "flag"
+				},
+				{
+					"array": false,
+					"default": false,
+					"description": "Use full distance matrix for guide-tree calculation (slow; mBed is default)",
+					"id": "full-distance",
+					"name": "Full distance matrix",
+					"required": false,
+					"type": "flag"
+				},
+				{
+					"array": false,
+					"default": false,
+					"description": "Use full distance matrix for guide-tree calculation during iteration (mBed is default)",
+					"id": "full-distance-iteration",
+					"name": "Full distance matrix for each iteration",
+					"required": false,
+					"type": "flag"
+				},
+				{
+					"array": false,
+					"default": 1,
+					"description": "Maximum number of HMM iterations",
+					"id": "max-hmm-iterations",
+					"max": 100,
+					"min": 1,
+					"name": "Max Guide tree iterations",
+					"required": false,
+					"type": "integer"
+				},
+				{
+					"array": false,
+					"default": 1,
+					"description": "Number of (combined guide tree/HMM) iterations",
+					"id": "iterations",
+					"max": 100,
+					"min": 1,
+					"name": "Number of iterations (combined)",
+					"required": false,
+					"type": "integer"
+				},
+				{
+					"array": false,
+					"default": 1,
+					"description": "Maximum guide tree iterations",
+					"id": "max-guidetree-iterations",
+					"max": 100,
+					"min": 1,
+					"name": "Max Guide tree iterations",
+					"required": false,
+					"type": "integer"
+				}
+			],
+			"presets": [],
+			"status": {
+				"errorMessage": "",
+				"status": "OK",
+				"timestamp": "2026-09-30T12:59:11"
+			},
+			"version": "1.2.4"
+		},
+		{
+			"@url": "/slivka/api/services/msaprobs",
+			"author": "Jorge Gonz\u00e1lez-Dom\u0131\u0301nguez, Yongchao Liu, Juan Touri\u00f1o, Bertil Schmidt",
+			"classifiers": [
+				"Topic :: Computational biology :: Sequence analysis",
+				"Operation :: Analysis :: Sequence analysis :: Sequence alignment :: Multiple sequence alignment"
+			],
+			"description": "MSAProbs is a well-established state-of-the-art multiple sequence alignment algorithm for protein sequences. The design of MSAProbs is based on a combination of pair hidden Markov models and partition functions to calculate posterior probabilities.",
+			"id": "msaprobs",
+			"license": "GNU GPL ver. 3",
+			"name": "MSAProbs",
+			"parameters": [
+				{
+					"array": false,
+					"default": null,
+					"description": "",
+					"id": "input",
+					"mediaType": "application/fasta",
+					"mediaTypeParameters": {},
+					"mimetype": "application/fasta",
+					"name": "Input file",
+					"required": true,
+					"type": "file"
+				},
+				{
+					"array": false,
+					"default": 2,
+					"description": "Number of passes of consistency transformation.",
+					"id": "consistency",
+					"max": 5,
+					"min": 0,
+					"name": "Consistency repetitions",
+					"required": false,
+					"type": "integer"
+				},
+				{
+					"array": false,
+					"default": 10,
+					"description": "Number of iterative refinement passes.",
+					"id": "iterative-refinement",
+					"max": 1000,
+					"min": 0,
+					"name": "Interative refinaement",
+					"required": false,
+					"type": "integer"
+				}
+			],
+			"presets": [],
+			"status": {
+				"errorMessage": "",
+				"status": "OK",
+				"timestamp": "2026-09-30T12:59:16"
+			},
+			"version": "0.9.7"
+		},
+		{
+			"@url": "/slivka/api/services/disembl",
+			"author": "Rune Linding, Lars Juhl Jensen",
+			"classifiers": [
+				"Topic :: Computational biology :: Sequence analysis",
+				"Operation :: Analysis :: Sequence analysis :: Protein sequence analysis"
+			],
+			"description": "",
+			"id": "disembl",
+			"license": "GNU GPL ver. 2",
+			"name": "DisEMBL",
+			"parameters": [
+				{
+					"array": false,
+					"default": null,
+					"description": "",
+					"id": "input",
+					"mediaType": "application/fasta",
+					"mediaTypeParameters": {},
+					"mimetype": "application/fasta",
+					"name": "Input file",
+					"required": true,
+					"type": "file"
+				}
+			],
+			"presets": [],
+			"status": {
+				"errorMessage": "",
+				"status": "OK",
+				"timestamp": "2026-09-30T12:59:16"
+			},
+			"version": "1.4"
+		},
+		{
+			"@url": "/slivka/api/services/rnaalifold",
+			"author": "Ivo L Hofacker, Stephan Bernhart, Ronny Lorenz",
+			"classifiers": [
+				"Topic::Computational biology::Sequence analysis",
+				"Topic::Computational biology::Nucleic acids::Nucleic acid structure analysis",
+				"Topic::Computational biology::Structure analysis::Nucleic acid structure analysis",
+				"Operation::Analysis::Sequence analysis::Nucleic acid sequence analysis",
+				"Operation::Analysis::Sequence analysis::Nucleic acid sequence analysis::Nucleic acid feature detection::RNA secondary structure prediction",
+				"Operation::Analysis::Structure analysis::Nucleic acid structure analysis::RNA secondary structure analysis::RNA secondary structure prediction",
+				"Operation::Analysis::Structure analysis::Nucleic acid structure analysis::Nucleic acid structure prediction::RNA secondary structure prediction",
+				"Operation::Prediction and recognition::Nucleic acid feature detection::RNA secondary structure prediction",
+				"Operation::Prediction and recognition::Nucleic acid structure prediction::RNA secondary structure prediction",
+				"Format::Textual format::FASTA-like (text)::FASTA-aln",
+				"Format::Textual format::ClustalW format",
+				"Data::Sequence::Nucleic acid sequence::RNA sequence",
+				"Data::Alignment::Sequence alignment::Nucleic acid sequence alignment",
+				"Data::Alignment::Sequence alignment::RNA sequence alignment"
+			],
+			"description": "Calculate secondary structures for a set of aligned RNAs.",
+			"id": "rnaalifold",
+			"license": "",
+			"name": "RNAalifold",
+			"parameters": [
+				{
+					"array": false,
+					"default": null,
+					"description": "Score pairs with endgaps same as gap\u2212gap pairs.",
+					"id": "endgaps",
+					"name": "Endgaps",
+					"required": false,
+					"type": "flag"
+				},
+				{
+					"array": false,
+					"default": null,
+					"description": "Output set of nucleotides with frequency > average",
+					"id": "mis",
+					"name": "Most Informative Sequence",
+					"required": false,
+					"type": "flag"
+				},
+				{
+					"array": false,
+					"default": null,
+					"description": "Calculate the partition function and base pairing probability matrix in addition to the mfe structure.",
+					"id": "partfunc",
+					"name": "Partition Function",
+					"required": false,
+					"type": "flag"
+				},
+				{
+					"array": false,
+					"default": null,
+					"description": "Assume a circular (instead of linear) RNA molecule.",
+					"id": "circular",
+					"name": "Circular",
+					"required": false,
+					"type": "flag"
+				},
+				{
+					"array": false,
+					"default": null,
+					"description": "Incorporate G\u2212Quadruplex formation into the structure prediction algorithm.",
+					"id": "g-quad",
+					"name": "G\u2212Quadruplex",
+					"required": false,
+					"type": "flag"
+				},
+				{
+					"array": false,
+					"default": null,
+					"description": "Add dangling energies for the bases adjacent to a helix on both sides.",
+					"id": "d2",
+					"name": "Dangling Energies",
+					"required": false,
+					"type": "flag"
+				},
+				{
+					"array": false,
+					"default": null,
+					"description": "Produce structures without lonely pairs (helices of length 1).",
+					"id": "no-lp",
+					"name": "No Lonely Pairs",
+					"required": false,
+					"type": "flag"
+				},
+				{
+					"array": false,
+					"default": null,
+					"description": "Do not allow GU pairs.",
+					"id": "no-gu",
+					"name": "No GU Pairs",
+					"required": false,
+					"type": "flag"
+				},
+				{
+					"array": false,
+					"default": null,
+					"description": "Do not allow GU pairs at the end of helices.",
+					"id": "no-closing-gu",
+					"name": "No Closing GU",
+					"required": false,
+					"type": "flag"
+				},
+				{
+					"array": false,
+					"default": null,
+					"description": "Use old energy evaluation, treating gaps as characters.",
+					"id": "old",
+					"name": "Old Energy",
+					"required": false,
+					"type": "flag"
+				},
+				{
+					"array": false,
+					"default": null,
+					"description": "Use ribosum scoring matrix.",
+					"id": "ribosum-scoring",
+					"name": "Ribosum Scoring",
+					"required": false,
+					"type": "flag"
+				},
+				{
+					"array": false,
+					"default": null,
+					"description": "Calculate a maximum expected accuracy structure.",
+					"id": "mea",
+					"name": "MEA Structure",
+					"required": false,
+					"type": "flag"
+				},
+				{
+					"array": false,
+					"default": 1.07,
+					"description": "In the calculation of the pf use scale*mfe as an estimate for the ensemble free energy (used to avoid overflows).",
+					"id": "pfscale",
+					"max": 10.0,
+					"maxExclusive": false,
+					"min": 0.0,
+					"name": "Scaling Factor",
+					"required": false,
+					"type": "decimal"
+				},
+				{
+					"array": false,
+					"default": 1e-06,
+					"description": "Threshold for base pair probabilities.",
+					"id": "bppm-threshold",
+					"max": 1.0,
+					"maxExclusive": false,
+					"min": 1e-08,
+					"minExclusive": false,
+					"name": "BPPM Threshold",
+					"required": false,
+					"type": "decimal"
+				},
+				{
+					"array": false,
+					"default": 37.0,
+					"description": "Rescale energy parameters to a temperature in C.",
+					"id": "temperature",
+					"max": 100.0,
+					"maxExclusive": false,
+					"min": 0.0,
+					"name": "Temperature",
+					"required": false,
+					"type": "decimal"
+				},
+				{
+					"array": false,
+					"default": 1.0,
+					"description": "Weight of the covariance term in the energy function.",
+					"id": "cfactor",
+					"max": 100.0,
+					"maxExclusive": false,
+					"min": 0.0,
+					"name": "Covariance Weight",
+					"required": false,
+					"type": "decimal"
+				},
+				{
+					"array": false,
+					"default": 1.0,
+					"description": "Penalty for non\u2212compatible sequences in the covariance term of the energy function.",
+					"id": "nfactor",
+					"max": 100.0,
+					"maxExclusive": false,
+					"min": 0.0,
+					"name": "Non\u2212compatible Penalty Weight",
+					"required": false,
+					"type": "decimal"
+				},
+				{
+					"array": false,
+					"default": null,
+					"description": "Input file containing aligned RNA sequences.",
+					"id": "infile",
+					"mediaType": "application/fasta",
+					"mediaTypeParameters": {},
+					"mimetype": "application/fasta",
+					"name": "Input Sequences",
+					"required": true,
+					"type": "file"
+				}
+			],
+			"presets": [],
+			"status": {
+				"errorMessage": "",
+				"status": "OK",
+				"timestamp": "2026-09-30T12:59:16"
+			},
+			"version": "2.4.18"
+		},
+		{
+			"@url": "/slivka/api/services/probcons",
+			"author": "Chuong Do",
+			"classifiers": [
+				"Topic :: Computational biology :: Sequence analysis",
+				"Operation :: Analysis :: Sequence analysis :: Sequence alignment :: Multiple sequence alignment",
+				"Operation :: Comparison :: Sequence comparison"
+			],
+			"description": "Probabilistic Consistency-based Multiple Alignment of Amino Acid Sequences.  PROBCONS is an efficient protein multiple sequence alignment program, which has demonstrated a statistically significant improvement in accuracy compared to several leading alignment tools.",
+			"id": "probcons",
+			"license": "Public Domain",
+			"name": "ProbCons",
+			"parameters": [
+				{
+					"array": false,
+					"default": null,
+					"description": "",
+					"id": "input",
+					"mediaType": "application/fasta",
+					"mediaTypeParameters": {},
+					"mimetype": "application/fasta",
+					"name": "Input file",
+					"required": true,
+					"type": "file"
+				},
+				{
+					"array": false,
+					"default": null,
+					"description": "Output sequences in alignment order rather than input order",
+					"id": "output-aligned",
+					"name": "Output aligned",
+					"required": false,
+					"type": "flag"
+				},
+				{
+					"array": false,
+					"default": 0,
+					"description": "This specifies the number of rounds of EM to be applied on the set of sequences being aligned. This option is used in case the default parameters are not appropriate for the particular sequences being aligned; in general, this option is not recommended as it may lead to unstable alignment parameters.",
+					"id": "pre-training",
+					"max": 20,
+					"min": 0,
+					"name": "Rounds of pre-training before aligning the sequences",
+					"required": false,
+					"type": "integer"
+				},
+				{
+					"array": false,
+					"default": 100,
+					"description": "This specifies the number of iterations of iterative refinement to be performed.  In each stage of iterative refinement, the set of sequences in the alignment is randomly partitioned into two groups. After projecting the alignments to these groups, the two groups are realigned, resulting in an alignment whose objective score is guaranteed to be at least that of the original alignment",
+					"id": "iterative-refinement",
+					"max": 100,
+					"min": 0,
+					"name": "Passes of iterative refinement",
+					"required": false,
+					"type": "integer"
+				},
+				{
+					"array": false,
+					"default": 2,
+					"description": "Each pass applies one round of the consistency transformation on the set of sequences. The consistency transformation is described in detail in the mentioned papers. In each round, the aligner computes the consistency transformation for each pair of sequences using all other sequences. The aligner then updates the posterior probability matrices of the pairwise alignments.",
+					"id": "consistency",
+					"max": 5,
+					"min": 0,
+					"name": "Passes of consistency transformation",
+					"required": false,
+					"type": "integer"
+				}
+			],
+			"presets": [],
+			"status": {
+				"errorMessage": "",
+				"status": "OK",
+				"timestamp": "2026-09-30T12:59:20"
+			},
+			"version": "1.12"
+		},
+		{
+			"@url": "/slivka/api/services/jpred",
+			"author": "Drozdetskiy A, Cole C, Procter J & Barton GJ.",
+			"classifiers": [
+				"Topic :: Computational biology :: Structure analysis :: Protein structure analysis :: Protein secondary structure",
+				"Topic :: Computational biology :: Proteins :: Protein structure analysis :: Protein secondary structure",
+				"Operation :: Analysis :: Structure analysis :: Protein structure analysis :: Protein secondary structure analysis :: Protein secondary structure prediction",
+				"Operation :: Prediction and recognition :: Protein secondary structure prediction",
+				"Operation :: Analysis :: Sequence analysis :: Protein sequence analysis :: Protein secondary structure prediction",
+				"Operation :: Analysis :: Sequence analysis :: Protein sequence analysis :: Protein feature detection :: Protein secondary structure prediction",
+				"Operation :: Prediction and recognition :: Protein feature detection :: Protein secondary structure prediction"
+			],
+			"description": "JPred is a Protein Secondary Structure Prediction server and has been in operation since approximately 1998. JPred incorporates the Jnet algorithm in order to make more accurate predictions. In addition to protein secondary structure JPred also makes predictions on Solvent Accessibility and Coiled-coil regions (Lupas method).",
+			"id": "jpred",
+			"license": "",
+			"name": "JPred",
+			"parameters": [
+				{
+					"array": false,
+					"default": null,
+					"description": "",
+					"id": "input",
+					"mediaType": "application/fasta",
+					"mediaTypeParameters": {},
+					"mimetype": "application/fasta",
+					"name": "Input file",
+					"required": true,
+					"type": "file"
+				},
+				{
+					"array": false,
+					"choices": [
+						"on",
+						"off"
+					],
+					"default": "on",
+					"description": "",
+					"id": "skippdb",
+					"name": "Skip PDB check",
+					"required": false,
+					"type": "choice"
+				},
+				{
+					"array": false,
+					"choices": [
+						"seq",
+						"fasta",
+						"msf",
+						"blc"
+					],
+					"default": "fasta",
+					"description": "",
+					"id": "format",
+					"name": "Input data format",
+					"required": false,
+					"type": "choice"
+				}
+			],
+			"presets": [],
+			"status": {
+				"errorMessage": "",
+				"status": "OK",
+				"timestamp": "2026-09-30T12:59:22"
+			},
+			"version": "4"
+		},
+		{
+			"@url": "/slivka/api/services/iupred",
+			"author": "Zsuzsanna Doszt\u00e1nyi, Veronika Csizm\u00f3k, P\u00e9ter Tompa and Istv\u00e1n Simon",
+			"classifiers": [
+				"Topic :: Computational biology :: Sequence analysis",
+				"Operation :: Analysis :: Sequence analysis :: Protein sequence analysis"
+			],
+			"description": "Prediction of Intrinsically Unstructured Proteins",
+			"id": "iupred",
+			"license": "",
+			"name": "IUPred",
+			"parameters": [
+				{
+					"array": false,
+					"default": null,
+					"description": "",
+					"id": "input",
+					"mediaType": "application/fasta",
+					"mediaTypeParameters": {},
+					"mimetype": "application/fasta",
+					"name": "Input file",
+					"required": true,
+					"type": "file"
+				},
+				{
+					"array": false,
+					"choices": [
+						"short",
+						"long",
+						"glob",
+						"all"
+					],
+					"default": "long",
+					"description": "Long - for prediction of long disordered regions, short - for prediction of short disordered regions (e.g. missing residues in X-ray structures) and glob - for predicting globular domains. All - for all methods",
+					"id": "type",
+					"name": "Disorder type",
+					"required": false,
+					"type": "choice"
+				}
+			],
+			"presets": [],
+			"status": {
+				"errorMessage": "",
+				"status": "OK",
+				"timestamp": "2026-09-30T12:59:22"
+			},
+			"version": "1.0"
+		},
+		{
+			"@url": "/slivka/api/services/clustalw",
+			"author": "Larkin MA, Blackshields G, Brown NP, Chenna R, McGettigan PA, McWilliam H, Valentin F, Wallace IM, Wilm A, Lopez R, Thompson JD, Gibson TJ, Higgins DG.",
+			"classifiers": [
+				"Topic :: Computational biology :: Sequence analysis",
+				"Operation :: Analysis :: Sequence analysis :: Sequence alignment :: Multiple sequence alignment"
+			],
+			"description": "ClustalW is a general purpose multiple alignment program for DNA or proteins.",
+			"id": "clustalw",
+			"license": "GNU GPL ver. 3",
+			"name": "ClustalW",
+			"parameters": [
+				{
+					"array": false,
+					"default": null,
+					"description": "",
+					"id": "input",
+					"mediaType": "application/fasta",
+					"mediaTypeParameters": {},
+					"mimetype": "application/fasta",
+					"name": "Input file",
+					"required": true,
+					"type": "file"
+				},
+				{
+					"array": false,
+					"default": false,
+					"description": "Residue-specific gaps off",
+					"id": "residue-gaps-off",
+					"name": "NOPGAP",
+					"required": false,
+					"type": "flag"
+				},
+				{
+					"array": false,
+					"default": false,
+					"description": "Disable sequence weighting",
+					"id": "weights-off",
+					"name": "No transition weighting",
+					"required": false,
+					"type": "flag"
+				},
+				{
+					"array": false,
+					"default": false,
+					"description": "Hydrophilic gaps off",
+					"id": "hydrophillic-gaps-off",
+					"name": "NOHGAP",
+					"required": false,
+					"type": "flag"
+				},
+				{
+					"array": false,
+					"default": 0.5,
+					"description": "Type of the sequence (PROTEIN or DNA)",
+					"id": "transition-weighting",
+					"max": 10.0,
+					"maxExclusive": false,
+					"min": 0.0,
+					"name": "Transition weighting",
+					"required": false,
+					"type": "decimal"
+				},
+				{
+					"array": false,
+					"choices": [
+						"protein",
+						"dna"
+					],
+					"default": "protein",
+					"description": "Type of the sequence (PROTEIN or DNA)",
+					"id": "type",
+					"name": "Type",
+					"required": false,
+					"type": "choice"
+				},
+				{
+					"array": false,
+					"choices": [
+						"input",
+						"aligned"
+					],
+					"default": "input",
+					"description": "As per INPUT or ALIGNED",
+					"id": "outorder",
+					"name": "OUTORDER",
+					"required": false,
+					"type": "choice"
+				},
+				{
+					"array": false,
+					"choices": [
+						"blosum100",
+						"blosum30",
+						"blosum35",
+						"blosum40",
+						"blosum45",
+						"blosum50",
+						"blosum55",
+						"blosum60",
+						"blosum62",
+						"blosum65",
+						"blosum70",
+						"blosum75",
+						"blosum80",
+						"blosum85",
+						"blosum90",
+						"blosumn",
+						"dayhoff",
+						"gonnet",
+						"identity",
+						"match",
+						"nuc.4.2",
+						"nuc.4.4",
+						"pam10",
+						"pam100",
+						"pam110",
+						"pam120",
+						"pam130",
+						"pam140",
+						"pam150",
+						"pam160",
+						"pam170",
+						"pam180",
+						"pam190",
+						"pam20",
+						"pam200",
+						"pam210",
+						"pam220",
+						"pam230",
+						"pam240",
+						"pam250",
+						"pam260",
+						"pam270",
+						"pam280",
+						"pam290",
+						"pam30",
+						"pam300",
+						"pam310",
+						"pam320",
+						"pam330",
+						"pam340",
+						"pam350",
+						"pam360",
+						"pam370",
+						"pam380",
+						"pam390",
+						"pam40",
+						"pam400",
+						"pam410",
+						"pam420",
+						"pam430",
+						"pam440",
+						"pam450",
+						"pam460",
+						"pam470",
+						"pam480",
+						"pam490",
+						"pam50",
+						"pam500",
+						"pam60",
+						"pam70",
+						"pam80",
+						"pam90"
+					],
+					"default": "blosum62",
+					"description": "Protein weight matrix",
+					"id": "matrix",
+					"name": "MATRIX",
+					"required": false,
+					"type": "choice"
+				},
+				{
+					"array": false,
+					"default": 10,
+					"description": "Gap opening penalty",
+					"id": "gap-open",
+					"max": 1000,
+					"maxExclusive": false,
+					"min": 0,
+					"name": "GAPOPEN",
+					"required": false,
+					"type": "decimal"
+				},
+				{
+					"array": false,
+					"default": 0.1,
+					"description": "Gap extension penalty",
+					"id": "gap-ext",
+					"max": 10,
+					"maxExclusive": false,
+					"min": 0,
+					"name": "GAPEXT",
+					"required": false,
+					"type": "decimal"
+				},
+				{
+					"array": false,
+					"default": 0.5,
+					"description": "End gap separation pen",
+					"id": "end-gaps",
+					"max": 10,
+					"maxExclusive": false,
+					"min": 0,
+					"name": "ENDGAPS",
+					"required": false,
+					"type": "decimal"
+				},
+				{
+					"array": false,
+					"default": 1,
+					"description": "Gap separation pen. range",
+					"id": "gap-dist",
+					"max": 50,
+					"min": 0,
+					"name": "GAPDIST",
+					"required": false,
+					"type": "integer"
+				}
+			],
+			"presets": [],
+			"status": {
+				"errorMessage": "",
+				"status": "OK",
+				"timestamp": "2026-09-30T12:59:22"
+			},
+			"version": "2.1"
+		}
+	]
 }

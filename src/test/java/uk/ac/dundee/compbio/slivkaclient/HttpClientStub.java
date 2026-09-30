@@ -13,6 +13,8 @@ import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
+import org.apache.commons.logging.LogFactory;
+
 import javajs.http.HttpClient;
 
 public class HttpClientStub implements HttpClient {

@@ -62,7 +62,7 @@ public class SlivkaJobManagementTests {
     }
     assertEquals(req.getMethod(), "GET");
     assertEquals(
-        req.getUri(), slivkaUrl.resolve(format("api/tasks/%s", jobId))
+        req.getUri(), slivkaUrl.resolve(format("api/jobs/%s", jobId))
     );
   }
 
