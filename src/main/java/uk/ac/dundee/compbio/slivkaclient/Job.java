@@ -13,90 +13,129 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-public class Job {
-  public enum Status {
+public class Job
+{
+  public enum Status
+  {
     PENDING, REJECTED, ACCEPTED, QUEUED, RUNNING, COMPLETED, INTERRUPTED,
     DELETED, FAILED, ERROR, UNKNOWN;
   }
 
-  private static final SimpleDateFormat dateFmt =
-      new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
+  private static final SimpleDateFormat dateFmt = new SimpleDateFormat(
+          "yyyy-MM-dd'T'HH:mm:ss");
 
   protected final URI url;
+
   protected final String id;
+
   protected final String service;
+
   protected final List<Map.Entry<String, String>> parameters;
+
   protected final Date submissionTime;
+
   protected Date completionTime;
+
   protected Status status;
 
-  public Job(
-      URI url, String id, String service,
-      List<Map.Entry<String, String>> parameters, String submissionTime,
-      String completionTime, String status) {
+  public Job(URI url, String id, String service,
+          List<Map.Entry<String, String>> parameters, String submissionTime,
+          String completionTime, String status)
+  {
     this.url = url;
     this.id = id;
     this.service = service;
     this.parameters = parameters;
-    this.submissionTime = dateFmt.parse(submissionTime, new ParsePosition(0));
+    this.submissionTime = dateFmt.parse(submissionTime,
+            new ParsePosition(0));
     setCompletionTime(completionTime);
     setStatus(status);
   }
 
-  static Job fromJSON(SlivkaClient client, JSONObject obj) throws JSONException {
+  static Job fromJSON(SlivkaClient client, JSONObject obj)
+          throws JSONException
+  {
     JSONObject paramsObj = obj.getJSONObject("parameters");
     List<Map.Entry<String, String>> parameters = new ArrayList<>();
-    for (String key : paramsObj.keySet()) {
+    for (String key : paramsObj.keySet())
+    {
       Object val = paramsObj.get(key);
-      if (JSONObject.NULL.equals(val)) {
+      if (JSONObject.NULL.equals(val))
+      {
         continue;
       }
-      else if (val instanceof String) {
+      else if (val instanceof String)
+      {
         parameters.add(new AbstractMap.SimpleEntry<>(key, (String) val));
       }
-      else if (val instanceof JSONArray) {
-        for (Object it : (JSONArray) val) {
-          if (!JSONObject.NULL.equals(it)) {
-            parameters.add(new AbstractMap.SimpleEntry<>(key, String.valueOf(it)));
+      else if (val instanceof JSONArray)
+      {
+        for (Object it : (JSONArray) val)
+        {
+          if (!JSONObject.NULL.equals(it))
+          {
+            parameters.add(
+                    new AbstractMap.SimpleEntry<>(key, String.valueOf(it)));
           }
         }
       }
-      else {
-        throw new JSONException("JSONObject[" + JSONObject.quote(key) +
-            "] not a string or array of strings.");
+      else
+      {
+        throw new JSONException("JSONObject[" + JSONObject.quote(key)
+                + "] not a string or array of strings.");
       }
     }
-    return new Job(
-        client.getUrl().resolve(obj.getString("@url")),
-        obj.getString("id"),
-        obj.getString("service"),
-        parameters,
-        obj.getString("submissionTime"),
-        obj.optString("completionTime", null),
-        obj.getString("status"));
+    return new Job(client.getUrl().resolve(obj.getString("@url")),
+            obj.getString("id"), obj.getString("service"), parameters,
+            obj.getString("submissionTime"),
+            obj.optString("completionTime", null), obj.getString("status"));
   }
 
-  public URI getUrl() { return url; }
+  public URI getUrl()
+  {
+    return url;
+  }
 
-  public String getId() { return id; }
+  public String getId()
+  {
+    return id;
+  }
 
-  public String getService() { return service; }
+  public String getService()
+  {
+    return service;
+  }
 
-  public List<Map.Entry<String, String>> getParameters() { return parameters; }
+  public List<Map.Entry<String, String>> getParameters()
+  {
+    return parameters;
+  }
 
-  public Date getSubmissionTime() { return submissionTime; }
+  public Date getSubmissionTime()
+  {
+    return submissionTime;
+  }
 
-  public Date getCompletionTime() { return completionTime; }
+  public Date getCompletionTime()
+  {
+    return completionTime;
+  }
 
-  void setCompletionTime(Date date) { completionTime = date; }
+  void setCompletionTime(Date date)
+  {
+    completionTime = date;
+  }
 
-  void setCompletionTime(String date) {
-    if (date != null) {
+  void setCompletionTime(String date)
+  {
+    if (date != null)
+    {
       setCompletionTime(dateFmt.parse(date, new ParsePosition(0)));
     }
   }
 
-  private void setStatus(String status) {
+  private void setStatus(String status)
+  {
     this.status = Status.valueOf(status.toUpperCase());
   }
 }

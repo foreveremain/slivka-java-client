@@ -1,38 +1,46 @@
 package uk.ac.dundee.compbio.slivkaclient;
 
+import java.io.IOException;
+import java.net.URI;
+import java.util.List;
 import javajs.http.HttpClientFactory;
+
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import java.io.IOException;
-import java.net.URI;
-import java.util.List;
-
+import static java.lang.String.format;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.fail;
-import static java.lang.String.format;
 
-public class SlivkaJobManagementTests {
+public class SlivkaJobManagementTests
+{
 
   private SlivkaClient client = null;
+
   private final HttpClientStub httpClient = new HttpClientStub();
+
   private static final URI slivkaUrl = URI
-      .create("http://example.org/slivka/");
+          .create("http://example.org/slivka/");
+
   private static final String jobId = "frdeQI2PTa6hh4fBsptnXg";
+
   private HttpClientStub.HttpRequestMock req = null;
+
   private HttpClientStub.HttpResponseMock rep = null;
 
   @BeforeClass
-  public void setUpClass() {
+  public void setUpClass()
+  {
     HttpClientFactory.setDefaultClassName(HttpClientStub.class.getName());
     client = SlivkaClient.newInstance(slivkaUrl);
     client.setHttpClient(httpClient);
   }
 
   @BeforeMethod
-  public void setUp() {
+  public void setUp()
+  {
     req = new HttpClientStub.HttpRequestMock();
     rep = new HttpClientStub.HttpResponseMock();
     rep.setHeader("Content-Type", "application/json");
@@ -41,71 +49,78 @@ public class SlivkaJobManagementTests {
   }
 
   @AfterMethod
-  public void tearDown() {
-    try {
+  public void tearDown()
+  {
+    try
+    {
       rep.close();
-    }
-    catch (IOException ioe) {
+    } catch (IOException ioe)
+    {
       ioe.printStackTrace();
     }
   }
 
   @Test
-  public void testJobStateRequest() {
+  public void testJobStateRequest()
+  {
     rep.setStatusCode(200);
     rep.setContentLocation("/response/job-completed-body.json");
-    try {
+    try
+    {
       client.fetchJobStatus(jobId);
-    }
-    catch (IOException e) {
+    } catch (IOException e)
+    {
       fail("connection error", e);
     }
     assertEquals(req.getMethod(), "GET");
-    assertEquals(
-        req.getUri(), slivkaUrl.resolve(format("api/jobs/%s", jobId))
-    );
+    assertEquals(req.getUri(),
+            slivkaUrl.resolve(format("api/jobs/%s", jobId)));
   }
 
   @Test
-  public void testCompletedState() {
+  public void testCompletedState()
+  {
     rep.setStatusCode(200);
     rep.setContentLocation("/response/job-completed-body.json");
-    try {
+    try
+    {
       var state = client.fetchJobStatus(jobId);
       assertEquals(state, Job.Status.COMPLETED);
-    }
-    catch (IOException e) {
+    } catch (IOException e)
+    {
       fail("connection error", e);
     }
   }
 
   @Test
-  public void testFailedState() {
+  public void testFailedState()
+  {
     rep.setStatusCode(200);
     rep.setContentLocation("/response/job-failed-body.json");
-    try {
+    try
+    {
       var state = client.fetchJobStatus(jobId);
       assertEquals(state, Job.Status.FAILED);
-    }
-    catch (IOException e) {
+    } catch (IOException e)
+    {
       fail("connection error", e);
     }
   }
 
-  @Test(enabled=false)
-  public void testJobCancellation() {
-	  fail("Not Implemented");
-	  rep.setStatusCode(200);
-//    try {
-		// Not currently implemented ?
-		// client.cancel(jobId);
-//    }
-//    catch (IOException e) {
-//      fail("connection error", e);
-//    }
-    assertEquals(
-        req.getUri(), slivkaUrl.resolve(format("api/tasks/%s", jobId))
-    );
+  @Test(enabled = false)
+  public void testJobCancellation()
+  {
+    fail("Not Implemented");
+    rep.setStatusCode(200);
+    // try {
+    // Not currently implemented ?
+    // client.cancel(jobId);
+    // }
+    // catch (IOException e) {
+    // fail("connection error", e);
+    // }
+    assertEquals(req.getUri(),
+            slivkaUrl.resolve(format("api/tasks/%s", jobId)));
     assertEquals(req.getMethod(), "DELETE");
   }
 }

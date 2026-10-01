@@ -7,34 +7,40 @@ import java.io.OutputStream;
 import java.net.URI;
 import java.util.Collection;
 import java.util.List;
-
 import javajs.http.HttpClient;
 
-public interface SlivkaClient {
+public interface SlivkaClient
+{
 
-  public static class Version {
+  public static class Version
+  {
     public final String server, API;
 
-    public Version(String server, String API) {
+    public Version(String server, String API)
+    {
       this.server = server;
       this.API = API;
     }
 
     @Override
-    public String toString() {
+    public String toString()
+    {
       return String.format("Version(server=%s, API=%s)", server, API);
     }
   }
 
-  public static SlivkaClient newInstance(HttpClient httpClient, URI url) {
+  public static SlivkaClient newInstance(HttpClient httpClient, URI url)
+  {
     return new SlivkaClientImpl(httpClient, url);
   }
 
-  public static SlivkaClient newInstance(URI address) {
+  public static SlivkaClient newInstance(URI address)
+  {
     return new SlivkaClientImpl(address);
   }
 
-  public static SlivkaClient newInstance(String address) {
+  public static SlivkaClient newInstance(String address)
+  {
     return new SlivkaClientImpl(address);
   }
 
@@ -57,10 +63,11 @@ public interface SlivkaClient {
   RemoteFile uploadFile(InputStream stream) throws IOException;
 
   String submitJob(SlivkaService service, RequestValues parameters)
-      throws IOException;
+          throws IOException;
 
   @Deprecated
-  default Job getJob(String id) throws IOException {
+  default Job getJob(String id) throws IOException
+  {
     return fetchJobInfo(id);
   }
 

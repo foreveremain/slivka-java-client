@@ -8,8 +8,10 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
-public class SlivkaService {
-  public static class Preset {
+public class SlivkaService
+{
+  public static class Preset
+  {
     public final String id;
 
     public final String name;
@@ -18,7 +20,9 @@ public class SlivkaService {
 
     public final Map<String, Object> values;
 
-    Preset(String id, String name, String description, Map<String, Object> values) {
+    Preset(String id, String name, String description,
+            Map<String, Object> values)
+    {
       this.id = id;
       this.name = name;
       this.description = description;
@@ -26,14 +30,16 @@ public class SlivkaService {
     }
   }
 
-  public static class Status {
+  public static class Status
+  {
     public final String statusString;
 
     public final String message;
 
     public final Date timestamp;
 
-    Status(String status, String message, String time) {
+    Status(String status, String message, String time)
+    {
       this.statusString = status;
       this.message = message;
       var parser = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
@@ -63,11 +69,11 @@ public class SlivkaService {
 
   public final Status status;
 
-  public SlivkaService(
-      URI url, String id, String name,
-      String description, String author, String version,
-      String license, List<String> classifiers, List<Parameter> parameters,
-      List<Preset> presets, Status status) {
+  public SlivkaService(URI url, String id, String name, String description,
+          String author, String version, String license,
+          List<String> classifiers, List<Parameter> parameters,
+          List<Preset> presets, Status status)
+  {
     this.id = id;
     this.url = url;
     this.name = name;
@@ -81,34 +87,70 @@ public class SlivkaService {
     this.status = status;
   }
 
-  public URI getUrl() { return url; }
+  public URI getUrl()
+  {
+    return url;
+  }
 
-  public String getId() { return id; }
+  public String getId()
+  {
+    return id;
+  }
 
-  public String getName() { return name; }
+  public String getName()
+  {
+    return name;
+  }
 
-  public String getDescription() { return description; }
+  public String getDescription()
+  {
+    return description;
+  }
 
-  public String getAuthor() { return author; }
+  public String getAuthor()
+  {
+    return author;
+  }
 
-  public String getVersion() { return version; }
+  public String getVersion()
+  {
+    return version;
+  }
 
-  public String getLicense() { return license; }
+  public String getLicense()
+  {
+    return license;
+  }
 
-  public List<String> getClassifiers() { return classifiers; }
+  public List<String> getClassifiers()
+  {
+    return classifiers;
+  }
 
-  public List<Parameter> getParameters() { return parameters; }
+  public List<Parameter> getParameters()
+  {
+    return parameters;
+  }
 
-  public Parameter getParameter(String id) {
-    for (Parameter param : getParameters()) {
-      if (param.id.equals(id)) {
+  public Parameter getParameter(String id)
+  {
+    for (Parameter param : getParameters())
+    {
+      if (param.id.equals(id))
+      {
         return param;
       }
     }
     return null;
   }
 
-  public List<Preset> getPresets() { return presets; }
+  public List<Preset> getPresets()
+  {
+    return presets;
+  }
 
-  public Status getStatus() { return status; }
+  public Status getStatus()
+  {
+    return status;
+  }
 }

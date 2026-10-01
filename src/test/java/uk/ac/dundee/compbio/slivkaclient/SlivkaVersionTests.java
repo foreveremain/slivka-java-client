@@ -1,35 +1,43 @@
 package uk.ac.dundee.compbio.slivkaclient;
 
+import java.io.IOException;
+import java.net.URI;
+import java.util.List;
 import javajs.http.HttpClientFactory;
+
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import java.io.IOException;
-import java.net.URI;
-import java.util.List;
-
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.fail;
 
-public class SlivkaVersionTests {
+public class SlivkaVersionTests
+{
 
   private SlivkaClient client = null;
+
   private final HttpClientStub httpClient = new HttpClientStub();
-  private static final URI slivkaUrl = URI.create("http://example.org/slivka/");
+
+  private static final URI slivkaUrl = URI
+          .create("http://example.org/slivka/");
+
   private HttpClientStub.HttpRequestMock req = null;
+
   private HttpClientStub.HttpResponseMock rep = null;
 
   @BeforeClass
-  public void setUpClass() {
+  public void setUpClass()
+  {
     HttpClientFactory.setDefaultClassName(HttpClientStub.class.getName());
     client = SlivkaClient.newInstance(slivkaUrl);
     client.setHttpClient(httpClient);
   }
 
   @BeforeMethod
-  public void setUp() {
+  public void setUp()
+  {
     req = new HttpClientStub.HttpRequestMock();
     rep = new HttpClientStub.HttpResponseMock();
     rep.setStatusCode(200);
@@ -40,32 +48,41 @@ public class SlivkaVersionTests {
   }
 
   @AfterMethod
-  public void tearDown() {
-    try {
+  public void tearDown()
+  {
+    try
+    {
       rep.close();
-    } catch (IOException ioe) {
+    } catch (IOException ioe)
+    {
       ioe.printStackTrace();
     }
   }
 
   @Test
-  public void testVersionRequest() {
-    try {
+  public void testVersionRequest()
+  {
+    try
+    {
       client.getVersion();
       assertEquals(req.getUri(), slivkaUrl.resolve("api/version"));
       assertEquals(req.getMethod(), "GET");
-    } catch (IOException ioe) {
+    } catch (IOException ioe)
+    {
       fail("connection error", ioe);
     }
   }
 
   @Test
-  public void testVersionNumber() {
-    try {
+  public void testVersionNumber()
+  {
+    try
+    {
       var version = client.getVersion();
       assertEquals(version.server, "0.8.3b2");
       assertEquals(version.API, "1.1");
-    } catch (IOException ioe) {
+    } catch (IOException ioe)
+    {
       fail("connection error", ioe);
     }
   }
