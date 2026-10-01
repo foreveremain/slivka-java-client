@@ -1,0 +1,261 @@
+import org.apache.tools.ant.taskdefs.condition.Os
+
+plugins {
+    id("de.undercouch.download") version "5.7.0"
+}
+
+description = 'Download Eclipse IDE'
+
+/**
+ * Although this is modelled on :download-jres, we actually only download only one OS/ARCH combination of Eclipse
+ * for use with :jalviewjs build.
+ * We create all OS-ARCH combinations of tasks for testing the URL.
+ */
+
+ext {
+  // our key to Eclipse key
+  /**
+   * OS and architecture maps from our keys to Eclipse IDE keys.
+   * See https://www.eclipse.org/downloads/packages/release/2026-03/r and subproject :download-eclipse.
+   */
+  // our key to adoptium key
+  osMap = [
+    "MACOS" : "macosx-cocoa",
+    "WINDOWS" : "win32", // this is for 64 bit, go figure
+    "LINUX" : "linux-gtk"
+  ]
+  archMap = [
+    "X64" : "x86_64",
+    "AARCH64" : "aarch64"
+  ]
+
+  // these could be set differently. Using 2024-03 as it's the last version that only needs Java 17.
+  eclipseVersion = "2024-03"
+  bundle = "java" // could be "jee"
+  
+  /**
+   * To set a native eclipseIDE
+   */
+  myOS = null
+  if (Os.isFamily(Os.FAMILY_MAC)) {
+    myOS = "MACOS"
+  }
+  if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+    myOS = "WINDOWS"
+  }
+  if (org.gradle.internal.os.OperatingSystem.current().isLinux()) { // for some reason org.apache.tools.ant.taskdefs.condition.Os doesn't have this check
+    myOS = "LINUX"
+  }
+  myARCH = null
+  String arch = Os.OS_ARCH
+  // A map of possible Os.OS_ARCH values to one of "AARCH64" (arm64) or "X64" (intel64)
+  def archesArchMap = [
+    "aarch64" : "AARCH64",
+    "x86_64" : "X64",
+    "amd64" : "X64"
+  ]
+  myARCH = archesArchMap[arch]
+  myOSARCH = "${myOS}-${myARCH}"
+  
+  addedNative = false
+
+  nonWritable = false
+}
+
+configurations {
+  consumable("eclipseDownload")
+  consumable("eclipseInstallation")
+  consumable("eclipseExecutable")
+}
+
+// DELETE THIS TASK AFTER DEBUGGING MORE OS_ARCH VALUES
+tasks.register("osInfo") {
+  description 'Show information about the operating system'
+  doLast {
+    println "Family:       ${Os.OS_NAME}"
+    println "Architecture: ${Os.OS_ARCH}"
+  }
+}
+
+// don't delete these with normal clean task
+tasks.register("reallyclean") {
+  group = "clean"
+  description = "Delete all artifacts including downloads in the build folder."
+
+  doFirst {
+    delete(buildDir)
+  }
+}
+
+// The clean task will delete unpacked eclipse dirs
+tasks.register("clean") {}
+
+void createOsArchTasksAndArtifacts(String version, String OS, String ARCH) {
+  def os = osMap[OS]
+  def arch = archMap[ARCH]
+  
+  def OSARCH = "${OS}-${ARCH}"
+  def osArch = "${os}-${arch}"
+
+  // Windows is a zip file, tar.gz is available for Linux and macOS
+  def zip = OS == "WINDOWS"
+  def extension = zip ? "zip" : "tar.gz"
+  
+  def eclipseBuildDir = "${buildDir}/eclipseIde-${bundle}-${version}-${OSARCH}"
+
+  def downloadTask = tasks.register("downloadEclipseIDE-${bundle}-${version}-${OSARCH}", Download) {
+    description = "Download Eclipse IDE ${version} for ${OSARCH} (${osArch})"
+    group = "download"
+
+    def archiveName = "eclipse-ide-${bundle}-${version}-${OSARCH}.${extension}"
+
+    // This is not exactly a published API but it seems stable
+    src("https://www.eclipse.org/downloads/download.php?file=/technology/epp/downloads/release/${version}/R/eclipse-${bundle}-${version}-R-${os}-${arch}.${extension}&r=1") // r=1 takes the link to the direct download
+
+    dest("${eclipseBuildDir}/download/${archiveName}")
+    
+    onlyIfModified(true)
+    retries(2)
+    useETag("all")
+  }
+  logger.info("Creating task '${downloadTask.name}'")
+
+  def unpackTask = tasks.register("unpackEclipseIDE-${bundle}-${version}-${OSARCH}", Copy) {
+    description = "Unpack Eclipse IDE ${version} for ${OSARCH} (${osArch})"
+    group = "unpack"
+    
+    def myDownload = downloadTask.get().dest
+    def myArchive = zip ? zipTree(myDownload) : tarTree(myDownload)
+    
+    from(myArchive)
+    into("${eclipseBuildDir}/unpack")
+
+    doFirst {
+      // set write permission and delete it before unpacking
+      if (destinationDir.exists()) {
+        ant.chmod(dir: destinationDir,
+        //includes: "**/*",
+        perm: "u+w", verbose: true, type: "both")
+        delete(destinationDir)
+      }
+    }
+
+    doLast {
+      /**
+       * We set the unpacked Eclipse to be non-writable, since subsequent calls to run this eclipse
+       * can alter the installation so that it no longer works with certain plugins.
+       */
+      // chmod -R a-w destinationDir (using ant task as gradle's filePermissions break if dirPermissions are set to a-w).
+      if (nonWritable) {
+        ant.chmod(dir: destinationDir, includes: "**/*", perm: "a-w", verbose: true, type: "both")
+      }
+    }
+
+    dependsOn(downloadTask)
+  }
+  logger.info("Creating task '${unpackTask.name}'")
+
+  tasks.register("clean${unpackTask.name.capitalize()}") {
+    doFirst {
+      // set write permission and delete it before unpacking
+      def destinationDir = unpackTask.get().destinationDir
+      if (destinationDir.exists()) {
+        ant.chmod(
+        dir: destinationDir,
+        //includes: "**/*",
+        perm: "u+w",
+        verbose: true,
+        type: "both"
+        )
+        delete(destinationDir)
+      }
+    }
+  }
+
+  tasks.named("clean") {
+    dependsOn("clean${unpackTask.name.capitalize()}")
+  }
+
+  def setEclipseExeTask = tasks.register("setEclipseExe-${bundle}-${version}-${OSARCH}") {
+    description = "Set the Eclipse IDE executable for ${OSARCH} ($osArch})"
+    group = "executable"
+    
+    def path = unpackTask.get().destinationDir.path
+    if (OS == "MACOS") {
+      path += "/Eclipse.app/Contents/MacOS/eclipse"
+    } else if (OS == "WINDOWS") {
+      path += "/eclipse/eclipsec.exe"
+    } else {
+      path += "/eclipse/eclipse"
+    }
+
+    ext.eclipse = path
+    
+    inputs.dir(unpackTask.get().destinationDir)
+    outputs.file(eclipse) // set as an output file for the consumable configuration eclipseExecutable-OS-ARCH
+
+    doFirst {
+      if (file(eclipse).exists()) {
+        logger.info("Setting Eclipse ${version} (${osArch}) executable to '${eclipse}'")
+      }
+    }
+
+    dependsOn(unpackTask)
+  }
+  logger.info("Creating task '${setEclipseExeTask.name}'")
+
+  if (myOSARCH == OSARCH) {
+    tasks.register("downloadEclipseIDE") {
+      description = "Download Eclipse IDE ${version} for native OS and architecture ${OSARCH} (${osArch})"
+      group = "native"
+
+      dependsOn(downloadTask)
+    }
+
+    tasks.register("unpackEclipseIDE") {
+      description = "Unpack Eclipse IDE ${version} for native OS and architecture ${OSARCH} (${osArch})"
+      group = "native"
+
+      dependsOn(unpackTask)
+    }
+
+    tasks.register("setEclipseExe") {
+      description = "Set the Eclipse IDE executable for native OS and architecture ${OSARCH} ($osArch})"
+      group = "native"
+
+      dependsOn(setEclipseExeTask)
+    }
+}
+
+  configurations {
+    // we will only use one of these from jalviewjs depending on the host OS and ARCH
+    consumable("eclipseDownload-${OSARCH}")
+    consumable("eclipseInstallation-${OSARCH}")
+    consumable("eclipseExecutable-${OSARCH}")
+  }
+  
+  artifacts {
+    add("eclipseDownload-${OSARCH}", downloadTask)
+    add("eclipseInstallation-${OSARCH}", unpackTask)
+    add("eclipseExecutable-${OSARCH}", setEclipseExeTask)
+    if (myOSARCH == OSARCH) {
+      logger.lifecycle("Adding native Eclipse IDE configurations for ${OSARCH} (${osArch})")
+      add("eclipseDownload", downloadTask)
+      add("eclipseInstallation", unpackTask)
+      add("eclipseExecutable", setEclipseExeTask)
+      addedNative = true
+    }
+  }
+}
+
+// now make the tasks for all OS/ARCH combinations
+osMap.keySet().sort().each { OS ->
+  archMap.keySet().sort().each { ARCH ->
+    logger.info("Creating ${project.name} tasks for '${OS}-${ARCH}'")
+    createOsArchTasksAndArtifacts(eclipseVersion, OS, ARCH)
+  }
+}
+
+
+
+

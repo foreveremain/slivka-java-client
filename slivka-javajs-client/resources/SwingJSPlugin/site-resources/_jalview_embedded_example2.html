@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Embedded JalviewJS Example 2</title><meta charset="utf-8" />
+<script src="swingjs/swingjs2.js"></script>
+<script>
+
+// NOTE: The applet on this page is "Jalview". 
+
+// BH 2019.10.06 adds Tree and Pca functionality
+// BH see issue JAL-3451
+
+if (!self.SwingJS)alert('swingjs2.js was not found. It needs to be in swingjs folder in the same directory as ' + document.location.href)
+Info = {
+  code: null,
+  main: "jalview.bin.JalviewJS2",
+  core: "NONE",
+//	core:"_jalview",
+
+	oninit:function() {$("#links").show();},
+	noannotation: true,
+	
+  readyFunction: null,
+	serverURL: 'https://chemapps.stolaf.edu/jmol/jsmol/php/jsmol.php',
+	j2sPath: 'swingjs/j2s',
+	console:'sysoutdiv',
+	allowjavascript: true
+}
+
+jvGet = function(what) {
+	switch(what) {
+	case "select1":
+		alert(Jalview1.getApp().getSelectedSequences());
+		break;
+	case "select2":
+		alert(Jalview2.getApp().getSelectedSequences());	
+		break;
+	case "select1fasta":
+		alert(Jalview1.getApp().getSelectedSequencesAsAlignment("fasta",true));
+		break;
+	case "select2fasta":
+		alert(Jalview2.getApp().getSelectedSequencesAsAlignment("fasta",true));
+		break;
+	}
+	
+}
+
+$(document).ready(function() {
+
+	  SwingJS.getApplet('Jalview1', Info);
+	  SwingJS.getApplet('Jalview2', Info);
+
+});
+
+</script>
+</head>
+<body style="background-image: url(images/coolVeryLightBG.png);">
+<table style="width:1000px;border:2px solid lightblue;border-spacing:0;font-size:16pt;" padding="10" valign="top">
+<tr>
+<td style="font-size:24;font-weight:bold;background-color:lightblue" colspan=2><center>Demonstration of embedded JalviewJS components</center>
+</td>
+
+
+</tr><tr>
+
+
+<td colspan=2 valign=top style="padding:20px;background-color:lightgray">
+this page tests two Jalview apps on the same page.
+<div id="Jalview1-desktop-div" style="width:0px;height:0px;"></div>
+<div id="Jalview2-desktop-div" style="width:0px;height:0px;"></div>
+</td></tr>
+<tr><td style="background-color:lightgray;padding:10px">
+<div id="Jalview1-alignment-div" style="padding:10px;position:relative;width:550px;height:300px">
+</td>
+<td style="background-color:lightgray;padding:10px">
+<div id="Jalview2-alignment-div" style="padding:10px;position:relative;width:550px;height:300px">
+</td>
+</tr>
+<tr><td>
+<div style="display:block;width:500px;height:300px;">
+<div id="sysoutdiv" style="border:1px solid green;width:100%;height:95%;overflow:auto"></div>
+This is System.out. <a href="javascript:J2S.thisApplet._clearConsole()">clear it</a> <br>Add ?j2snocore to URL to see full class list; ?j2sdebug to use uncompressed j2s/core files <br><a href="javascript:getClassList()">get _j2sClassList.txt</a>
+</div>
+
+</td><td valign=top>
+<div id=links style="display:none">
+<a href="javascript:jvGet('select1')">Show Jalview1 selections</a>
+
+<a href="javascript:jvGet('select2')">Show Jalview2 selections</a>
+
+<br>
+<a href="javascript:jvGet('select1fasta')">Show Jalview1 selections (fasta)</a>
+
+<a href="javascript:jvGet('select2fasta')">Show Jalview2 selections (fasta)</a>
+</div>
+</td></tr>
+</table>
+
+
+</body>
+</html>

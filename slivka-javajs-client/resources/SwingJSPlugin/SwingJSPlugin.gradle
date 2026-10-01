@@ -1,0 +1,1778 @@
+import org.apache.tools.ant.taskdefs.condition.Os
+import org.gradle.api.model.ObjectFactory
+import org.gradle.api.provider.Property
+import org.gradle.api.file.FileSystemLocation
+import java.nio.file.Paths
+import java.security.MessageDigest
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.TimeUnit
+
+/**
+ * This InjectedExecOps interface is needed to run javaexec in a loop for each classlist closure.
+ * We can't do this in the normal way of using a method to create multiple JavaExec tasks as the
+ * list of classlists is obtained from swingjs extension and so only available at task execution
+ * stage.
+ */
+interface InjectedExecOps {
+    @Inject //@javax.inject.Inject
+    ExecOperations getExecOps()
+}
+
+public interface SwingJsPluginExtension {
+  Property<String> getEclipseInstallation();
+  Property<Boolean> getEclipseDebug();
+  Property<String> getAppResources();
+  Property<String> getImportPath();
+  Property<String> getClasslistsDir();
+  Property<String> getAppLibsDir();
+  Property<Project> getTargetProject();
+  Property<Integer> getJavaVersion();
+  Property<String> getAppName();
+  Property<String> getMainClass();
+  Property<String> getArchiveFileName();
+  Property<String> getChromeBinary();
+  Property<String> getChromeTestOutputString();
+
+  // You probably don't want to mess with these
+  Property<String> getSwingjsDir();
+  Property<String> getSwingjsResourcesDir();
+  Property<String> getSwingjsServerUrl();
+}
+
+class SwingJSPlugin implements Plugin<Project> {
+
+  // Source: https://mvnrepository.com/artifact/com.google.javascript/closure-compiler
+  // This is the last version that runs with Java 17.
+  // closureCompiler gets put into a project configuration dependency in the apply() method.
+  private String closureCompiler = "com.google.javascript:closure-compiler:v20240317"
+
+  private Project project = null
+
+  private Logger logger = null
+
+  private TaskCollection tasks = null
+
+  // This system property is set by a running Eclipse IDE
+  private final String eclipseApplicationProperty = "eclipse.application"
+
+  // This system property is set when Eclipse is running headlessly
+  private final String eclipseHeadlessBuildProperty = "net.sf.j2s.core.headlessbuild"
+
+  // A flag to set at init to determine if this gradle run is within an Eclipse IDE GUI
+  private boolean inEclipseGui = false;
+
+  private final String j2sAltJ2sFilePropertyName = "j2s.config.altfileproperty"
+
+  private final String j2sTemplateHtmlProperty = "j2s.template.html"
+
+  private final String j2sSiteDirProperty = "j2s.site.directory"
+
+  private final String propsFilename = "swingjs.props"
+
+  private File propsFile = null
+
+  private Properties props = null
+
+  private String j2sBuildDir = null
+
+  private String targetProjectJ2sConfigFilename = ".j2s"
+
+  private String altJ2sConfigFilename = "j2s.config"
+
+  private String defaultJ2sConfig = null
+
+  private String altJ2sConfig = null
+
+  private String relativeAltJ2sConfig = null
+
+  private String j2sConfig = null
+
+  private String j2sAltFileProperty = "swingjsplugin.j2sfilename"
+
+  private String j2sSiteDir
+
+  private String j2sTransferSiteJsDir
+
+  private Map coreHash = [:]
+
+
+  String eclipseVersion = null
+
+  private List headlessArgs = [
+    "-nosplash",
+    "--launcher.suppressErrors",
+    "-console",
+    "-consoleLog"
+  ]
+
+  private String j2sBuildDirName = "swingjs"
+
+  private String j2sCoreJar = "net.sf.j2s.core-j11.jar"
+
+  private boolean inEclipseGui() {
+    def eclipseApplicationPropertyVal = System.properties[eclipseApplicationProperty]
+
+    def inEclipseApp = eclipseApplicationPropertyVal != null && eclipseApplicationPropertyVal.startsWith("org.eclipse.ui.")
+
+    def inHeadlessBuild = "true".equals(System.properties[eclipseHeadlessBuildProperty])
+
+    if (inEclipseApp) {
+      if (inHeadlessBuild) {
+        logger.lifecycle("In an Eclipse IDE headless run")
+      } else {
+        logger.lifecycle("In an Eclipse IDE GUI")
+      }
+    }
+
+    return inEclipseApp && !inHeadlessBuild
+  }
+
+  /**
+   * Colour console output styler from https://stackoverflow.com/a/56139852
+   */
+  def styler = 'black red green yellow blue magenta cyan white'.split().toList().withIndex(30).collectEntries { key, val -> [(key) : { "\033[${val}m${it}\033[0m" }] }
+
+  private Properties _getPropertiesFromFile(String filename) {
+    def myPropsFile = project.file(filename)
+    def myProps = new Properties()
+    if (myPropsFile.exists()) {
+      try {
+        def myFIS = new FileInputStream(myPropsFile)
+        myProps.load(myFIS)
+        myFIS.close()
+      } catch (Exception e) {
+        logger.error("Exception when loading properties file '${filename}'", e)
+      }
+    }
+    return myProps
+  }
+
+  private void loadProps() {
+    propsFile = project.file("${j2sBuildDir}/${propsFilename}")
+
+    props = new Properties()
+    props.putAll(_getPropertiesFromFile(propsFile.path))
+  }
+
+  private void storeProps() {
+    try {
+      propsFile.parentFile.mkdirs()
+      def fos = new FileOutputStream(propsFile)
+      props.store(fos, "SwingJS")
+      fos.close()
+    } catch (Exception e) {
+      logger.error("Exception when storing swingjs props file '${propsFile}'", e)
+    }
+  }
+
+  // This method should be called as the first action in doFirst{} for tasks that should not run
+  // when in the Eclipse IDE GUI
+  private void dontRunInEclipse(String name) {
+    // do not run this task when we claim to be in Eclipse
+    if (inEclipseGui) {
+      logger.lifecycle("Skipping task ${name} as I think we are in the Eclipse GUI")
+      throw new StopExecutionException("Not running headless tasks whilst we are in Eclipse")
+    }
+  }
+
+  // This method should be called as the first action in doFirst{} for tasks that *should* run
+  // when in the Eclipse IDE GUI (although it is not as essential)
+  private void runInEclipse(String name) {
+    // do not run this task when we are not in Eclipse
+    if (!inEclipseGui) {
+      logger.lifecycle("Skipping task ${name} as we are not in the Eclipse GUI")
+      throw new GradleException("Not running Eclipse IDE tasks whilst we are not in Eclipse")
+    }
+  }
+
+  /**
+   * apply()
+   */
+  @Override
+  void apply(Project project) {
+    this.project = project
+    this.logger = project.logger
+
+    def swingjs = project.extensions.create("swingjs", SwingJsPluginExtension)
+    tasks = project.tasks
+
+    /* init */
+    inEclipseGui = inEclipseGui()
+
+    // set the j2sBuildDir
+    j2sBuildDir = "${project.buildDir}/${j2sBuildDirName}"
+
+    // set the default j2s config file
+    defaultJ2sConfig = "${targetProjectJ2sConfigFilename}" // from project rootDir
+
+    // set the alternative j2s config file (for headless Eclipse)
+    altJ2sConfig = "${j2sBuildDir}/${altJ2sConfigFilename}" // from project rootDir
+
+    // we use the alternative j2s file if not in Eclipse GUI
+    if (inEclipseGui) {
+      j2sConfig = defaultJ2sConfig
+    } else {
+      j2sConfig = altJ2sConfig
+    }
+
+    // load the plugin props file
+    props = new Properties()
+    loadProps()
+
+    j2sSiteDir = "${j2sBuildDir}/site"
+    if (inEclipseGui) {
+      // In Eclipse IDE we transpile directly into the site (for live transpile while editing)
+      j2sTransferSiteJsDir = j2sSiteDir
+    } else {
+      j2sTransferSiteJsDir = "${j2sBuildDir}/transfer/site_js"
+    }
+
+    /* swingjsplugin configuration needed for the closure compiler */
+    project.configurations {
+      swingjsplugin
+    }
+
+    project.dependencies {
+      swingjsplugin(closureCompiler)
+    }
+
+    tasks.register("createAltJ2sConfig", WriteProperties) {
+      ext.j2sProps = new Properties()
+      def defaultJ2sValuesFile = swingjs.swingjsResourcesDir.get() + "/config/default_j2s"
+      try {
+        j2sProps.putAll(_getPropertiesFromFile(defaultJ2sValuesFile))
+      } catch (Exception e) {
+        logger.error("Exception reading default config values file '${defaultJ2sValuesFile}'", e)
+      }
+      // add the site output dir
+      // we need a relative path from jalview-app/build to jalviewjs/build/swingjs/...
+      def rootDir = Paths.get(swingjs.targetProject.get().projectDir.path)
+
+      def relativizePaths = [
+        "${j2sSiteDirProperty}" : j2sTransferSiteJsDir
+      ]
+      if (j2sProps[j2sTemplateHtmlProperty] != null) {
+        relativizePaths += [
+          "${j2sTemplateHtmlProperty}": j2sProps[j2sTemplateHtmlProperty]
+        ]
+      }
+
+      // always set this
+      j2sProps["j2s.compiler.java.version"] = swingjs.javaVersion.get()
+
+      relativizePaths.each { key, val ->
+        def path = Paths.get(val)
+        if (!path.isAbsolute()) {
+          path = Paths.get(project.projectDir.path).resolve(path)
+        }
+
+        def relativePath = rootDir.relativize(path)
+
+        if (!(relativePath.startsWith("./") || relativePath.startsWith("../") || relativePath.startsWith("/") || relativePath.startsWith("~"))) {
+          relativePath = "./${relativePath}"
+        }
+        logger.info("Setting ${key} property to relative path '${relativePath}'")
+
+        j2sProps[key] = relativePath
+      }
+
+      properties(j2sProps)
+
+      comment = "Created by SwingJSPlugin"
+      destinationFile = project.file(altJ2sConfig)
+    }
+
+    tasks.register("createJ2sFile") {
+      description = "Create the default .j2s file *in the target project* enabling the alternative J2S Config file for headless (or IDE GUI) build by adding the ${j2sAltJ2sFilePropertyName} property (and the ${j2sSiteDirProperty} and ${j2sTemplateHtmlProperty} properties) to the default .j2s file"
+      group = "swingjs"
+
+      /**
+       * The j2sAltJ2sFilePropertyName ("j2s.config.altfileproperty") is a config key that
+       * swingjs looks for when running in Eclipse.  The value is taken as *another* property
+       * name (in our case j2sAltFileProperty ("swingjsplugin.j2sfilename")).  If this second
+       * property ("swingjsplugin.j2sfilename") is present then swingjs will use the value of
+       * the second property as the filename to use *instead* of ".j2s" for config.
+       *
+       * This task simply puts
+       *   j2s.config.altfileproperty=swingjsplugin.j2sfilename
+       * into your existing .j2s file.  If there isn't one it creates a default-values one
+       * with this extra property added.  It is only needed for the transpile task.
+       */
+
+      def j2sProps = new Properties()
+      def targetProjectJ2sConfig = swingjs.targetProject.get().getProjectDir().getPath() + "/${targetProjectJ2sConfigFilename}"
+      def targetProjectJ2sConfigFile = project.file(targetProjectJ2sConfig)
+      def existing = false
+      def save = false
+      if (targetProjectJ2sConfigFile.exists()) {
+        existing = true
+        try {
+          logger.info("Reading .j2s config file '${styler['cyan'](targetProjectJ2sConfigFile.path)}'")
+          j2sProps.putAll(_getPropertiesFromFile(targetProjectJ2sConfigFile.path))
+        } catch (Exception e) {
+          logger.error("Exception reading existing .j2s config file '${styler['cyan'](targetProjectJ2sConfigFile.path)}'", e)
+        }
+      }
+
+      // always add the j2sAltJ2sFilePropertyName
+      if (j2sProps[j2sAltJ2sFilePropertyName] != j2sAltFileProperty) {
+        j2sProps.put(j2sAltJ2sFilePropertyName, j2sAltFileProperty.toString())
+        logger.info("Adding property '${j2sAltJ2sFilePropertyName}'='${j2sAltFileProperty}' to the .j2s config file '${styler['cyan'](targetProjectJ2sConfigFile.path)}'")
+        save = true
+      }
+
+      def otherJ2sProps = tasks.named("createAltJ2sConfig").get().j2sProps
+      def addedNewProperty = false
+      def addedProps = [ "${j2sSiteDirProperty}" : false, "${j2sTemplateHtmlProperty}" : false ]
+      addedProps.keySet().sort().each { propertyName ->
+        def newPropertyVal = otherJ2sProps[propertyName].toString()
+        if (j2sProps[propertyName] != newPropertyVal) {
+          if (j2sProps[propertyName] == null) {
+            logger.warn("J2S property '${propertyName}' is not set in '${styler['cyan'](targetProjectJ2sConfigFile.path)}'.  Setting to '${newPropertyVal}'")
+          } else if (j2sProps[propertyName] != newPropertyVal) {
+            logger.warn("J2S property '${propertyName}' in '${styler['cyan'](targetProjectJ2sConfigFile.path)}' was set to '${j2sProps[propertyName]}'.\nNow setting to '${newPropertyVal}'")
+          }
+          j2sProps[propertyName] = newPropertyVal
+          addedProps[propertyName] = true
+          addedNewProperty = true
+          save = true
+        } else {
+          logger.lifecycle("J2S property '${propertyName}' in '${styler['cyan'](targetProjectJ2sConfigFile.path)}' is already set to '${newPropertyVal}'")
+        }
+      }
+
+      doFirst {
+        // if the .j2s file didn't exist, load the default values to save
+        // This is the .j2s in the target project rootDir, not the alt j2s.config file in jalviewjs
+
+        if (!existing) {
+          def defaultJ2sValuesFile = swingjs.swingjsResourcesDir.get() + "/config/default_j2s"
+          try {
+            // We favour the j2sProps alrady read or set
+            def combinedProps = _getPropertiesFromFile(defaultJ2sValuesFile)
+            combinedProps.putAll(j2sProps)
+            j2sProps.putAll(combinedProps)
+            save = true
+          } catch (Exception e) {
+            logger.error("Exception reading default config values file '${defaultJ2sValuesFile}'", e)
+          }
+        }
+
+        if (save) {
+          try {
+            logger.lifecycle("Writing .j2s config file '${styler['cyan'](targetProjectJ2sConfigFile.path)}'")
+            targetProjectJ2sConfigFile.parentFile.mkdirs() // this should be the project dir anyway
+            def fos = new FileOutputStream(targetProjectJ2sConfigFile)
+            j2sProps.store(fos, null)
+          } catch (Exception e) {
+            logger.error("Exception writing .j2s config file '${styler['cyan'](targetProjectJ2sConfigFile.path)}'", e)
+          }
+        }
+
+        if (addedNewProperty) {
+          // Note: .toString() and .keySet() is needed to sort or cast to String the props in this block for successful Eclipse IDE/Buildship import.
+          addedProps.keySet().sort().each { prop ->
+            if (addedProps[prop]) {
+              logger.warn("The J2S property '${prop.toString()}' has been added/changed to '${j2sProps[prop].toString()}'.\n" + styler['magenta']('You may need to restart Eclipse IDE for this to take effect.'))
+            }
+          }
+
+        }
+      }
+
+      j2sProps.each { key, val ->
+        //inputs.property(key, val)
+      }
+      outputs.file(targetProjectJ2sConfigFile)
+
+      dependsOn("createAltJ2sConfig")
+    }
+
+    def setEclipseWorkspace = tasks.register("setEclipseWorkspace") {
+      group = "swingjs"
+
+      def savedEclipseWorkspace = props.getProperty("eclipse_workspace", null)
+
+      def storeProps = false
+
+      if (inEclipseGui) {
+        logger.info("Working from Eclipse IDE GUI, not using a temporary Eclipse workspace")
+        savedEclipseWorkspace = "/tmp/not_used"
+      } else {
+
+        if (savedEclipseWorkspace == null || !project.file(savedEclipseWorkspace).exists()) {
+          def tempDir = File.createTempDir("SwingJSPlugin_eclipse_workspace-")
+          savedEclipseWorkspace = tempDir.getAbsolutePath()
+          props.setProperty("eclipse_workspace", savedEclipseWorkspace)
+          storeProps = true
+          logger.lifecycle("Setting new eclipse workspace '${savedEclipseWorkspace}'")
+        } else {
+          logger.info("Using existing eclipse workspace '${savedEclipseWorkspace}'")
+        }
+
+      }
+
+      ext.workspacePath = savedEclipseWorkspace
+      def eclipseWorkspaceDir = project.file(workspacePath)
+
+      doFirst {
+        dontRunInEclipse(name)
+
+        if (storeProps) {
+          this.storeProps()
+          logger.info("New Eclipse workspace is set to '${workspacePath}'")
+        } else {
+          logger.info("Existing Eclipse workspace is '${workspacePath}'")
+        }
+      }
+
+      if (project.file(workspacePath).exists()) {
+        inputs.property("workspacePath", workspacePath)
+      }
+      outputs.file(propsFile)
+      outputs.upToDateWhen { inEclipseGui || ( !storeProps && eclipseWorkspaceDir.exists() && eclipseWorkspaceDir.path == workspacePath && propsFile.exists() ) }
+    }
+
+    tasks.register("deleteEclipseWorkspace") {
+      description = "Deletes the temporary Eclipse Workspace created by setEclipseWorkspace with path stored in ${j2sBuildDir}/${propsFilename}:eclipse_workspace. Use with caution."
+      group = "clean"
+
+      def savedEclipseWorkspace = props.getProperty("eclipse_workspace", null)
+      doFirst {
+        if (savedEclipseWorkspace == null || !project.file(savedEclipseWorkspace).exists()) {
+          logger.info("No saved Eclipse workspace to delete")
+        } else {
+          logger.warn("${styler['magenta']('Warning!')} Deleting saved Eclipse workspace '${styler['cyan'](savedEclipseWorkspace)}'!")
+          project.delete(savedEclipseWorkspace)
+          props.remove("eclipse_workspace")
+          this.storeProps()
+        }
+      }
+
+    }
+
+    tasks.register("clean") {
+      group = "clean"
+
+      doFirst {
+        project.delete("${project.buildDir}")
+      }
+
+      mustRunAfter("deleteEclipseWorkspace")
+    }
+
+    def setEclipsePaths = tasks.register("setEclipsePaths") {
+      group = "swingjs"
+
+      def eclipseProduct = null
+
+      def eclipseRoot = "${swingjs.eclipseInstallation.getOrNull()}"
+      if (eclipseRoot.startsWith("~/")) {
+        eclipseRoot = System.getProperty("user.home") + eclipseRoot.substring(1)
+      }
+
+      ext.eclipseBinary = null
+
+      if (Os.isFamily(Os.FAMILY_MAC)) {
+        if (!eclipseRoot.endsWith("/Eclipse.app")) {
+          eclipseRoot += "/Eclipse.app"
+        }
+        eclipseBinary = "${eclipseRoot}/Contents/MacOS/eclipse"
+        eclipseProduct = "${eclipseRoot}/Contents/Eclipse/.eclipseproduct"
+      } else if (Os.isFamily(Os.FAMILY_WINDOWS)) { // check these paths!!
+        // if it doesn't exist because it hasn't been unpacked yet we guess
+        if (!project.file("${eclipseRoot}/eclipse").exists() || (project.file("${eclipseRoot}/eclipse").isDirectory() && project.file("${eclipseRoot}/eclipse/.eclipseproduct").exists())) {
+          eclipseRoot += "/eclipse"
+        }
+        eclipseBinary = "${eclipseRoot}/eclipsec.exe"
+        eclipseProduct = "${eclipseRoot}/.eclipseproduct"
+      } else { // linux or unix
+        // if it doesn't exist because it hasn't been unpacked yet we guess
+        if (!project.file("${eclipseRoot}/eclipse").exists() || (project.file("${eclipseRoot}/eclipse").isDirectory() && project.file("${eclipseRoot}/eclipse/.eclipseproduct").exists())) {
+          eclipseRoot += "/eclipse"
+        }
+        eclipseBinary = "${eclipseRoot}/eclipse"
+        eclipseProduct = "${eclipseRoot}/.eclipseproduct"
+      }
+      logger.info("Setting eclipse binary to '${eclipseBinary}'")
+
+      eclipseVersion = props.getProperty("eclipseVersion")
+
+      // set the relativeAltJ2sConfig path
+      def rootDir = Paths.get(swingjs.targetProject.get().projectDir.path)
+      def configPath = Paths.get(altJ2sConfig)
+      relativeAltJ2sConfig = rootDir.relativize(configPath)
+      logger.info("Setting relativeAltJ2sConfig to '${relativeAltJ2sConfig}'")
+
+      doFirst {
+        dontRunInEclipse(name)
+
+        def eclipseProductFile = project.file(eclipseProduct)
+        if (eclipseProductFile.exists()) {
+          def fis = new FileInputStream(eclipseProductFile)
+          def eclipseProps = new Properties()
+          eclipseProps.load(fis)
+          fis.close()
+          def newEclipseVersion = eclipseProps.getProperty("version")
+          if (eclipseVersion != newEclipseVersion) {
+            eclipseVersion = newEclipseVersion
+            props["eclipseVersion"] = eclipseVersion
+            storeProps()
+          }
+          logger.lifecycle("Configured Eclipse version is '${eclipseVersion}'")
+        }
+      }
+
+      // These files might not exist at configuration time, so we only add them as properties
+      inputs.property("eclipseProduct", eclipseProduct)
+      inputs.property("eclipseBinary", eclipseBinary)
+
+      dependsOn("setEclipseWorkspace")
+    }
+
+    def eclipseCopyDropins = tasks.register("eclipseCopyDropins", Copy) {
+      group = "swingjs"
+
+      ext.j2sPluginJar = swingjs.swingjsDir.get() + "/${j2sCoreJar}"
+      from(swingjs.swingjsResourcesDir.get() + "/dropins") {
+        include("*.jar")
+      }
+      from(j2sPluginJar)
+      into("${j2sBuildDir}/dropins")
+
+      eachFile { details ->
+        logger.info("Copying '${details.getRelativePath()}' to '${destinationDir}'")
+      }
+    }
+
+    tasks.register("transferUnzipSwingJs", Copy) {
+      group = "swingjs"
+
+      ext.swingjsZip = swingjs.swingjsDir.get() + "/SwingJS-site.zip"
+      from(project.zipTree(swingjsZip))
+      into("${j2sBuildDir}/transfer/site_swingjs")
+
+      doFirst {
+        logger.info("Unpacking '${swingjsZip}' into '${destinationDir}'")
+      }
+    }
+
+    tasks.register("transferUnzipLibJs", Copy) {
+      group = "swingjs"
+
+      def libjsDir = swingjs.swingjsResourcesDir.get() + "/libjs"
+      def libZipFiles = project.fileTree(dir: libjsDir, include: "*.zip")
+
+      libZipFiles.each {
+        from(project.zipTree(it))
+      }
+      into("${j2sBuildDir}/transfer/site_libjs")
+
+      doFirst {
+        libZipFiles.each {
+          logger.info("Unpacking '${it}' into '${destinationDir}'")
+        }
+      }
+    }
+
+    tasks.register("transferAppLibs", Copy) {
+      group = "swingjs"
+
+      into("${j2sBuildDir}/transfer/site_appLibs")
+
+      def appLibsFiles = []
+      def appLibsDir = swingjs.appLibsDir.getOrNull()
+      if (appLibsDir == null) {
+        logger.info("No appLibsDir defined, nothing to unzip")
+      } else {
+        appLibsFiles = project.fileTree(dir: appLibsDir, include: "*.zip")
+      }
+
+      appLibsFiles.each {
+        from(project.zipTree(it))
+      }
+
+      doFirst {
+        appLibsFiles.each {
+          logger.info("Unpacking '${it}' into '${destinationDir}'")
+        }
+      }
+    }
+
+    tasks.register("transferSiteResources", Copy) {
+      group = "swingjs"
+
+      into("${j2sBuildDir}/transfer/site_siteResources")
+      into("swingjs/j2s") {
+        from(swingjs.swingjsResourcesDir.get() + "/site-resources")
+      }
+    }
+
+    tasks.register("transferAppResources", Copy) {
+        if (swingjs.appResources.getOrNull() != null) {
+			group = "swingjs"
+
+      into("${j2sBuildDir}/transfer/site_appResources")
+      into("swingjs/j2s") {
+        from(swingjs.appResources.get())
+      }
+        }
+    }
+
+    tasks.register("eclipseSetup") {
+      description = "Run tasks to configure and copy files needed to run Eclipse headlessly"
+      group = "swingjs"
+
+      dependsOn("setEclipsePaths")
+      dependsOn("eclipseCopyDropins")
+      dependsOn("setEclipseWorkspace")
+    }
+
+    tasks.register("eclipseSetupTargetProject") {
+      // ensure targetProject has a .project and .classpath eclipse file
+      def projectPath = swingjs.targetProject.get().path
+      dependsOn("${projectPath}:eclipseProject")
+      dependsOn("${projectPath}:eclipseClasspath")
+    }
+
+    tasks.register("projectClean") {
+      description = "Clean the target project with the headless Eclipse workspace"
+      group = "swingjs"
+
+      def projectBinPath = swingjs.targetProject.get().projectDir.path + "/bin"
+
+      doFirst {
+        dontRunInEclipse(name)
+
+        logger.lifecycle("Deleting ${projectBinPath}")
+        swingjs.targetProject.get().delete(projectBinPath)
+      }
+
+      outputs.upToDateWhen {
+        !project.file(projectBinPath).exists()
+      }
+
+      dependsOn("eclipseSetup")
+    }
+
+    tasks.register("projectImport", Exec) {
+      description = "Import the target project into the headless Eclipse workspace"
+      group = "swingjs"
+
+      def projectName = swingjs.targetProject.get().name
+      def projectDir = swingjs.targetProject.get().projectDir.path
+      def importPath = swingjs.importPath.getOrNull() == null ? swingjs.targetProject.get().projectDir.path : swingjs.importPath.get()
+      def eclipseWorkspacePath = setEclipseWorkspace.get().workspacePath
+      def workspaceMetadataPath = "${eclipseWorkspacePath}/.metadata"
+      def workspaceProjDir = "${workspaceMetadataPath}/.plugins/org.eclipse.core.resources/.projects/${projectName}"
+      def workspaceLogFile = project.file("${workspaceMetadataPath}/.log")
+
+      def checkImported = {
+        // These tests are a good check that the project got imported into the eclipse workspace
+        project.file("${workspaceProjDir}/.location").exists()
+        &&
+        workspaceLogFile.exists()
+        &&
+        workspaceLogFile.text =~ ("MESSAGE (Importing|Refreshing) project ${projectName} ")
+      }
+
+      executable(setEclipsePaths.get().eclipseBinary)
+      
+      def eclipseArgs = []
+      eclipseArgs += [ "-data", eclipseWorkspacePath ]
+      eclipseArgs += [ "-application", "com.seeq.eclipse.importprojects.headlessimport" ]
+      eclipseArgs += [ "-importProject", importPath ]
+      if (swingjs.eclipseDebug) {
+        eclipseArgs += [ "-debug" ]
+      }
+      eclipseArgs += headlessArgs
+      eclipseArgs += [ "--launcher.appendVmargs" ]
+      eclipseArgs += [ "-vmargs" ]
+      eclipseArgs += [ "-Dorg.eclipse.equinox.p2.reconciler.dropins.directory=${eclipseCopyDropins.get().destinationDir}" ]
+      if (!inEclipseGui) {
+        eclipseArgs += [ "-D${eclipseHeadlessBuildProperty}=true" ]
+        eclipseArgs += [ "-D${j2sAltFileProperty}=${relativeAltJ2sConfig}" ]
+      }
+
+      args(eclipseArgs)
+
+      doFirst {
+        dontRunInEclipse(name)
+
+        if (
+          checkImported()
+        ) {
+          logger.info("Imported project folder '${workspaceProjDir}' exists.  Not re-running ${name}.")
+          throw new StopExecutionException("Imported project folder '${workspaceProjDir}' exists.  Not re-running ${name}.")
+        }
+
+        logger.lifecycle("Running command: '" + styler["cyan"](commandLine.join(" ")) + "'")
+      }
+      
+      doLast {
+        // Copy the workspace log to somewhere more obviously findable
+        def eclipseWorkspaceLog = "${eclipseWorkspacePath}/.metadata/.log"
+        def newName = "eclipse-workspace.log"
+        if (project.file(eclipseWorkspaceLog).exists()) {
+          logger.lifecycle("Copying eclipse workspace log file '${styler['cyan'](eclipseWorkspaceLog)}'\nto '${styler['cyan']("${project.buildDir}/logs/${newName}")}'")
+          project.copy {
+            from(eclipseWorkspaceLog)
+            rename {
+              return newName
+            }
+            into("${project.buildDir}/logs")
+          }
+        }
+      }
+
+      outputs.file("${importPath}/.project")
+      outputs.dir(workspaceProjDir)
+      outputs.upToDateWhen {
+        return inEclipseGui || checkImported()
+      }
+
+      dependsOn("eclipseSetupTargetProject")
+      dependsOn("eclipseSetup")
+    }
+
+    tasks.register("projectTranspile", Exec) {
+      description = "Import the target project into the headless Eclipse workspace"
+      group = "swingjs"
+
+      def cleanBuild = true
+      def buildArg = cleanBuild ? "-cleanBuild" : "-build"
+      def projectName = swingjs.targetProject.get().name
+
+      executable(setEclipsePaths.get().eclipseBinary)
+      
+      def eclipseWorkspacePath = setEclipseWorkspace.get().workspacePath
+
+      def eclipseArgs = []
+      eclipseArgs += [ "-data", eclipseWorkspacePath ]
+      eclipseArgs += [ "-application", "org.eclipse.jdt.apt.core.aptBuild" ]
+      eclipseArgs += [ buildArg, projectName ]
+      if (swingjs.eclipseDebug) {
+        eclipseArgs += [ "-debug" ]
+      }
+      eclipseArgs += headlessArgs
+      eclipseArgs += [ "--launcher.appendVmargs" ]
+      eclipseArgs += [ "-vmargs" ]
+      eclipseArgs += [ "-Dorg.eclipse.equinox.p2.reconciler.dropins.directory=${eclipseCopyDropins.get().destinationDir}" ]
+      if (!inEclipseGui) {
+        eclipseArgs += [ "-D${eclipseHeadlessBuildProperty}=true" ]
+        eclipseArgs += [ "-D${j2sAltFileProperty}=${relativeAltJ2sConfig}" ]
+      }
+
+      args(eclipseArgs)
+
+      def logPathname = project.file("${project.buildDir}/logs/${name}")
+      def logOutFile = project.file("${logPathname}.out")
+      def logErrFile = project.file("${logPathname}.err")
+      def outFOS = null
+      def errFOS = null
+
+      doFirst {
+        dontRunInEclipse(name)
+
+        // we run the projectClean actions in doFirst rather than dependsOn("projectClean") so it isn't run if there are no changes
+        if (cleanBuild) {
+          def projectClean = tasks.named("projectClean").get()
+          projectClean.getActions().each { it.execute(projectClean) }
+        }
+
+        logOutFile.getParentFile().mkdirs()
+        outFOS = new FileOutputStream(logOutFile, false) // false == don't append
+        errFOS = new FileOutputStream(logErrFile, false) // false == don't append
+        standardOutput = new org.apache.tools.ant.util.TeeOutputStream(outFOS, System.out)
+        errorOutput = new org.apache.tools.ant.util.TeeOutputStream(errFOS, System.err)
+
+        logger.info("Logging ${name} stdout to ${logOutFile.getPath()}")
+        logger.info("Logging ${name} stderr to ${logErrFile.getPath()}")
+
+        logger.lifecycle("Running command: '" + styler["cyan"](commandLine.join(" ")) + "'")
+      }
+
+      ignoreExitValue = true // catch errors in doLast
+
+      // dir inputs and outputs are checked at configuration time
+      swingjs.targetProject.get().sourceSets.main.java.srcDirs.each {
+        inputs.dir(it)
+        logger.info("Adding ${it} as an input")
+      }
+      swingjs.targetProject.get().sourceSets.main.resources.srcDirs.each {
+        inputs.dir(it)
+        logger.info("Adding ${it} as an input")
+      }
+      inputs.file(tasks.named("transferUnzipSwingJs").get().swingjsZip)
+      outputs.dir(j2sTransferSiteJsDir)
+
+      def javaCount = 0
+      swingjs.targetProject.get().sourceSets.main.java.srcDirs.each { srcDir ->
+          srcDir.traverse(type: groovy.io.FileType.FILES, nameFilter: ~/.*\.java/) { javaCount++ };
+      }
+      outputs.upToDateWhen {
+        if (inEclipseGui) {
+          return true
+        }
+
+        def outputDir = project.file(j2sTransferSiteJsDir)
+        if (!outputDir.exists()) {
+          logger.info("Project transpile output dir '${outputDir}' doesn't exist")
+          return false
+        }
+        def jsCount = 0
+        outputDir.traverse(type: groovy.io.FileType.FILES, nameFilter: ~/.*\.js/) { jsCount++ };
+
+        def enough = jsCount > javaCount * 0.95 // more than 95% of .java souces files have been converted to .js files.  It isn't exact.
+        logger.info("There are ${jsCount} .js files from ${javaCount} .java files (${enough ? 'Enough' : 'Not enough'})")
+
+        return enough
+      }
+
+      doLast {
+        dontRunInEclipse(name)
+
+        outFOS.close()
+        errFOS.close()
+
+        // Copy the workspace log to somewhere more obviously findable
+        def eclipseWorkspaceLog = "${eclipseWorkspacePath}/.metadata/.log"
+        def newName = "eclipse-workspace.log"
+        if (project.file(eclipseWorkspaceLog).exists()) {
+          logger.lifecycle("Copying eclipse workspace log file '${styler['cyan'](eclipseWorkspaceLog)}'\nto '${styler['cyan']("${project.buildDir}/logs/${newName}")}'")
+          project.copy {
+            from(eclipseWorkspaceLog)
+            rename {
+              return newName
+            }
+            into("${project.buildDir}/logs")
+          }
+        }
+
+        def execResult = executionResult.get()
+        if (execResult.getExitValue() != 0) {
+          logger.error(logFile.text)
+          execResult.rethrowFailure()
+          throw new GradleException("Task ${name} exited with non-zero result.\nSee log file '${logErrFile.getPath()}' for more details.")
+        }
+        def newJsCount = 0
+        logOutFile.eachLine {
+          if (it.contains("J2S transpiling ")) { newJsCount++ }
+        }
+        def enough = newJsCount > javaCount * 0.95 // more than 95% of .java souces files have been converted to .js files.  It isn't exact.
+        logger.info("There are ${styler['cyan'](newJsCount)} new .js files from ${styler['cyan'](javaCount)} .java files (${styler[enough ? 'green' : 'red'](enough ? 'Enough' : 'Not enough')})")
+        if (!enough) {
+          throw new GradleException(
+            """Task ${name} does not seem to have transpiled enough .java files to .js files
+              |(${javaCount}) ->  ${newJsCount}).
+              |If the eclipse command appears to have run, it might be the eclipse installation has
+              |become 'corrupted' for use by java2script.  In this case running
+              |  ./gradlew :download-eclipse:clean
+              |to clear and re-unpack the Eclipse IDE (or do the same to your Eclipse installation), and/or
+              |  ./gradlew :jalviewjs:clean
+              |to clear the eclipse-workspace, and previously transpiled .js files, might help.
+              |
+              |See log files
+              |  '${logOutFile.getPath()}'
+              |and
+              |  '${logErrFile.getPath()}'
+              |for more details.""".stripMargin()
+          )
+        }
+      }
+
+      dependsOn("createJ2sFile")
+      dependsOn("eclipseSetupTargetProject")
+      dependsOn("eclipseSetup")
+      dependsOn("projectImport")
+    }
+
+    /**
+     * method and tasks to call the callCore tasks
+     */
+    def buildCore = { String name, List list, String prefixFile, String suffixFile, String outputDir, String jsfilename, String zjsfilename ->
+
+      def jsfile = "${outputDir}/${jsfilename}"
+      def zjsfile = "${outputDir}/${zjsfilename}"
+
+      def coreFile = project.file(jsfile)
+      logger.info("Creating core for ${name}...\nGenerating ${jsfile}")
+
+      def coreTop = project.file(prefixFile)
+      def coreBottom = project.file(suffixFile)
+      coreFile.getParentFile().mkdirs()
+      coreFile.createNewFile()
+      coreFile.write( coreTop.getText("UTF-8") )
+
+      list.each {
+        f ->
+        if (f.exists()) {
+          def t = f.getText("UTF-8")
+          t.replaceAll("Clazz\\.([^_])","Clazz_${1}")
+          coreFile.append( t )
+        } else {
+          logger.info("...file '${f.getPath()}' does not exist, skipping")
+        }
+      }
+      coreFile.append( coreBottom.getText("UTF-8") )
+
+      logger.info("Generating ${zjsfile}")
+
+      /** JavaExec substitute.
+       * This use of javaexec (instead of creating a collection of JavaExec tasks)
+       * is necessary as the list of classlist files comes from a swingjs extension
+       * which isn't populated until after configuration stage.  Once we are in the
+       * task execution stage new tasks cannot be made.
+       */
+      def injected = project.objects.newInstance(InjectedExecOps)
+      injected.execOps.javaexec {
+        logger.lifecycle("Running closure compiler for '${name}'")
+
+        mainClass = "com.google.javascript.jscomp.CommandLineRunner"
+        classpath = project.configurations.swingjsplugin
+        jvmArguments = [ "-Dfile.encoding=UTF-8", "-Xmx2g" ]
+        args = [
+          "--compilation_level",
+          "SIMPLE_OPTIMIZATIONS",
+          "--warning_level", "QUIET",
+          "--charset", "UTF-8",
+          "--js", jsfile,
+          "--js_output_file", zjsfile
+        ]
+      }
+    }
+
+    tasks.register("setupJ2sCoreClassLists") {
+      def transferUnzipSwingJsDir = tasks.named("transferUnzipSwingJs").get().destinationDir
+      def transferUnzipLibJsDir = tasks.named("transferUnzipLibJs").get().destinationDir
+      def j2sDir = "${j2sTransferSiteJsDir}/swingjs/j2s"
+      def swingJ2sDir = "${transferUnzipSwingJsDir}/swingjs/j2s"
+      def libJ2sDir = "${transferUnzipLibJsDir}/swingjs/j2s"
+      def appJ2sDir = "${tasks.named("transferAppLibs").get().destinationDir}/swingjs/j2s"
+      // add the classlists found in swingjs.classlistsDir
+      def classlistFilesHash = [:]
+      project.fileTree(dir: swingjs.classlistsDir.get(), include: "*.txt").each {
+        def name = it.getName() - ".txt"
+        classlistFilesHash[name] = it
+      }
+
+      classlistFilesHash["_j2sclasslist"]= project.file(swingjs.swingjsDir.get() + "/_j2sclasslist.txt")
+
+      ext.j2sCoreClasslists = []
+      classlistFilesHash.each { name, file ->
+        if (! file.exists()) {
+          logger.info("Classlist file '${file.getPath()}' does not exist, skipping")
+          return false // this is a "continue" in groovy .each closure
+        }
+        if (name == null) {
+          name = file.getName() - ".txt"
+        }
+
+        def filelist = file.readLines()
+        // Resolve lazily in classlist order, with the site's last copy winning.
+        def list = project.provider {
+          filelist.collect { path ->
+            [appJ2sDir, swingJ2sDir, libJ2sDir, j2sDir]
+              .collect { dir -> new File(dir, path) }
+              .find { candidate -> candidate.isFile() }
+          }.findAll { it != null }
+        }
+
+        def jsfile = "core${name}.js"
+        def zjsfile = "core${name}.z.js"
+
+        j2sCoreClasslists += [
+          'jsfile': jsfile,
+          'zjsfile': zjsfile,
+          'list': list,
+          'name': name
+        ]
+      }
+
+      // _all core
+      def allClasslistName = "_all"
+      def allJsFiles = project.fileTree(
+        dir: j2sDir,
+        include: "**/*.js"
+      )
+      allJsFiles += project.fileTree(
+        dir: libJ2sDir,
+        include: "**/*.js",
+      )
+      allJsFiles += project.fileTree(
+        dir: swingJ2sDir,
+        include: "**/*.js",
+        excludes: [
+// these are old exclusions, might not need to be excluded now
+//          "**/sun/misc/Unsafe.js",
+//          "**/swingjs/jquery/jquery-editable-select.js",
+//          "**/swingjs/jquery/j2sComboBox.js",
+//          "**/sun/misc/FloatingDecimal.js"
+          // these exlusions are files that the closure-compiler produces errors for.
+          "**/org/apache/xerces/jaxp/datatype/*.js",
+          "**/org/apache/harmony/luni/util/*.js",
+          "**/org/apache/commons/cli/ParseException.js",
+        ]
+      )
+      def allClasslist = [
+        'jsfile': "core${allClasslistName}.js",
+        'zjsfile': "core${allClasslistName}.z.js",
+        'list': allJsFiles as List,
+        'name': allClasslistName
+      ]
+      // not including this version of "all" core at the moment
+      //j2sCoreClasslists += allClasslist
+    }
+
+    tasks.register("buildCores") {
+      description = "Build the core js lib closures listed in the classlists dir"
+      group = "swingjs"
+
+      def transferUnzipSwingJsDir = tasks.named("transferUnzipSwingJs").get().destinationDir
+      ext.destinationDir = "${j2sBuildDir}/transfer/site_core_js"
+      def outputDir = "${destinationDir}/swingjs/j2s/core"
+      String prefixFile = "${transferUnzipSwingJsDir}/swingjs/js/core/coretop2.js"
+      String suffixFile = "${transferUnzipSwingJsDir}/swingjs/js/core/corebottom2.js"
+
+      doFirst {
+        def j2sCoreClasslists = tasks.named("setupJ2sCoreClassLists").get().j2sCoreClasslists
+        j2sCoreClasslists.each {
+          buildCore(it.name, it.list.get(), prefixFile, suffixFile, outputDir, it.jsfile, it.zjsfile)
+        }
+      }
+
+      inputs.dir(swingjs.classlistsDir.get())
+      inputs.files(swingjs.swingjsDir.get() + "/_j2sclasslist.txt")
+      inputs.files(project.provider {
+        tasks.named("setupJ2sCoreClassLists").get().j2sCoreClasslists.collect { it.list.get() }
+      })
+      inputs.file(prefixFile)
+      inputs.file(suffixFile)
+      outputs.dir(outputDir)
+
+      dependsOn("setupJ2sCoreClassLists")
+      dependsOn("projectTranspile")
+      dependsOn("transferUnzipSwingJs")
+      dependsOn("transferUnzipLibJs")
+      dependsOn("transferAppLibs")
+      dependsOn(project.configurations.swingjsplugin)
+    }
+
+    tasks.register("createCoreTemplates") {
+      description = "Create the closure-compiler core HTML launch files"
+      group = "swingjs"
+
+      ext.destinationDir = "${j2sBuildDir}/transfer/site_core_templates"
+      def inputFile = project.file(swingjs.swingjsResourcesDir.get() + "/templates/coretemplate.html")
+
+      def j2sCoreClasslists = tasks.named("setupJ2sCoreClassLists").get().j2sCoreClasslists
+
+      doFirst {
+        j2sCoreClasslists.each { cl ->
+          def coreName = cl.name
+          def templateName = swingjs.appName.get()
+          def outputFilename = "${templateName}_${coreName}.html"
+          def replaceMap = [
+            '_MAIN_': "\"${swingjs.mainClass.get()}\"",
+            '_CODE_': "null",
+            '_NAME_': "${templateName} [core ${coreName}]",
+            '_COREKEY_': "core",
+            '_CORENAME_': coreName
+          ]
+
+          project.copy {
+            from(inputFile)
+            rename {
+              return outputFilename
+            }
+            filter { line ->
+              replaceMap.each { key, val ->
+                line = line.replaceAll(key, val)
+              }
+              return line
+            }
+            into("${destinationDir}")
+          }
+        }
+      }
+
+      inputs.file(inputFile)
+      outputs.dir(destinationDir)
+
+      dependsOn("setupJ2sCoreClassLists")
+    }
+
+
+    tasks.register("transferOtherSiteFiles", Copy) {
+      description = "Any extra files needed to be copied into the j2s site directory can be added to extra configuration of this Copy task.  Simply add a `tasks.named('transferOtherSiteFiles') { into('subdir') { from(sourceFile) } }` to your build.gradle.  Multiple into('subdir'){} blocks can be specified."
+      group = "swingjs"
+
+      into("${j2sBuildDir}/transfer/site_otherSiteFiles")
+    }
+
+
+    /**
+     * The sync* tasks assemble the prepared build/swingjs/transfer/site_* folders to build/swingjs/site.
+     * No processing or filtering should be done here as all tasks will likely need to re-run as
+     * the site dir is changed by each task.
+     */
+
+    tasks.register("copyLibJs", Copy) {
+      group = "swingjs"
+
+      from(tasks.named("transferUnzipLibJs").get().destinationDir)
+      into(j2sSiteDir)
+
+      duplicatesStrategy = DuplicatesStrategy.INCLUDE
+
+      mustRunAfter("cleanSite")
+      dependsOn("transferUnzipLibJs")
+    }
+
+    tasks.register("copyAppLibs", Copy) {
+      group = "swingjs"
+
+      from(tasks.named("transferAppLibs").get().destinationDir)
+      into(j2sSiteDir)
+
+      duplicatesStrategy = DuplicatesStrategy.INCLUDE
+
+      doFirst {
+        if (swingjs.appLibsDir.getOrNull() == null) {
+          throw new StopExecutionException("No appLibsDir defined, nothing to Copy")
+        }
+      }
+
+      mustRunAfter("cleanSite")
+      dependsOn("transferAppLibs")
+    }
+
+    tasks.register("copySwingJs", Copy) {
+      group = "swingjs"
+
+      from(tasks.named("transferUnzipSwingJs").get().destinationDir)
+      into(j2sSiteDir)
+
+      duplicatesStrategy = DuplicatesStrategy.INCLUDE
+
+      mustRunAfter("cleanSite")
+      dependsOn("transferUnzipSwingJs")
+    }
+
+    tasks.register("copyAppResources", Copy) {
+      group = "swingjs"
+	  if (swingjs.appResources.getOrNull() != null) {
+      from(tasks.named("transferAppResources").get().destinationDir)
+      into(j2sSiteDir)
+
+      duplicatesStrategy = DuplicatesStrategy.INCLUDE
+
+      doFirst {
+        if (swingjs.appResources.getOrNull() == null) {
+          throw new StopExecutionException("No appResources defined, nothing to Copy")
+        }
+      }
+
+      mustRunAfter("cleanSite")
+      dependsOn("transferAppResources")
+	  }
+    }
+
+    tasks.register("copySiteResources", Copy) {
+      group = "swingjs"
+
+      from(tasks.named("transferSiteResources").get().destinationDir)
+      into(j2sSiteDir)
+
+      duplicatesStrategy = DuplicatesStrategy.INCLUDE
+
+      mustRunAfter("cleanSite")
+      dependsOn("transferSiteResources")
+    }
+
+    tasks.register("copyJs", Copy) {
+      group = "swingjs"
+
+      from(j2sTransferSiteJsDir)
+      into(j2sSiteDir)
+
+      duplicatesStrategy = DuplicatesStrategy.INCLUDE
+
+      mustRunAfter("cleanSite")
+      dependsOn("projectTranspile")
+    }
+
+    tasks.register("copyCores", Copy) {
+      group = "swingjs"
+
+      from(tasks.named("buildCores").get().destinationDir)
+      into(j2sSiteDir)
+
+      duplicatesStrategy = DuplicatesStrategy.INCLUDE
+
+      mustRunAfter("cleanSite")
+      dependsOn("buildCores")
+    }
+
+    tasks.register("copyCoreTemplates", Copy) {
+      group = "swingjs"
+
+      from(tasks.named("createCoreTemplates").get().destinationDir)
+      into(j2sSiteDir)
+
+      duplicatesStrategy = DuplicatesStrategy.INCLUDE
+
+      mustRunAfter("cleanSite")
+      dependsOn("createCoreTemplates")
+    }
+
+    tasks.register("copyOtherSiteFiles", Copy) {
+      group = "swingjs"
+
+      from(tasks.named("transferOtherSiteFiles").get().destinationDir)
+      into(j2sSiteDir)
+
+      duplicatesStrategy = DuplicatesStrategy.INCLUDE
+
+      mustRunAfter("cleanSite")
+      dependsOn("transferOtherSiteFiles")
+    }
+
+    tasks.register("cleanSite") {
+      group = "clean"
+
+      doFirst {
+        project.delete(j2sSiteDir)
+      }
+    }
+
+    /**
+     * This makes sure these tasks are executed in order (gradle requires an order).
+     * There is little overlap, but copySwingJs and copyLibJs should execute after copyJs.
+     */
+    tasks.named("copyCores") { mustRunAfter("cleanSite") }
+    tasks.named("copyAppResources") { mustRunAfter("copyCores") }
+    tasks.named("copySiteResources") { mustRunAfter("copyAppResources") }
+    tasks.named("copyJs") { mustRunAfter("copySiteResources") }
+    tasks.named("copyCoreTemplates") { mustRunAfter("copyJs") }
+    tasks.named("copyLibJs") { mustRunAfter("copyCoreTemplates") }
+    tasks.named("copySwingJs") { mustRunAfter("copyLibJs") }
+    tasks.named("copyOtherSiteFiles") { mustRunAfter("copySwingJs") }
+    tasks.named("copyAppLibs") { mustRunAfter("copyOtherSiteFiles") }
+
+
+    tasks.register("prepareSite") {
+      // This is used for preparing the site directory in Eclipse IDE as well as when using gradlew
+      description = "Copy all components, except for closure compiler cores and app resources, of the J2S site into the J2S site directory"
+      group = "swingjs"
+
+      outputs.dir(tasks.named("copySiteResources").get().destinationDir)
+
+      dependsOn("copySiteResources")
+      dependsOn("copyLibJs")
+      dependsOn("copySwingJs")
+      dependsOn("copyOtherSiteFiles")
+      dependsOn("copyAppLibs")
+    }
+
+    tasks.register("buildSite") {
+      description = "Copy all components of the J2S site into the J2S site directory"
+      group = "swingjs"
+
+      doFirst {
+        dontRunInEclipse()
+      }
+
+      outputs.dir(tasks.named("copyJs").get().destinationDir)
+
+      dependsOn("cleanSite")
+      dependsOn("copyJs")
+      dependsOn("prepareSite")
+      dependsOn("copyAppResources")
+      dependsOn("copyCores")
+      dependsOn("copyCoreTemplates")
+    }
+
+    tasks.register("siteTar", Tar) {
+      description = "Create a .tar.gz file for the J2S site directory"
+      group = "swingjs"
+
+      from(tasks.named("buildSite").get().outputs)
+      into("site") // this is inside the tar file
+
+      compression = Compression.GZIP
+      archiveFileName = swingjs.archiveFileName.get()
+      destinationDirectory = project.file("${j2sBuildDir}/tar")
+
+      dependsOn("buildSite")
+    }
+
+
+
+    tasks.register("copyStderrLaunchTestFile", Copy) {
+      group = "swingjs-chrometest"
+
+      def defaultServerUrl = "https://chemapps.stolaf.edu/jmol/jsmol/php/jsmol.php"
+      def configuredServerUrl = swingjs.swingjsServerUrl.getOrNull()
+      def replaceMap = [
+        '__MAINCLASS__' : swingjs.mainClass.get(),
+        '__SERVERURL__' : configuredServerUrl == null ? defaultServerUrl : configuredServerUrl
+      ]
+
+      from(swingjs.swingjsResourcesDir.get() + "/templates/launchTest-stderr.html")
+      into(j2sSiteDir)
+      filter { line ->
+        replaceMap.each { key, val ->
+          line = line.replaceAll(key, val)
+        }
+        return line
+      }
+
+      ext.stderrLaunchTestFile = "${destinationDir}/launchTest-stderr.html"
+    }
+
+    tasks.register("chromeProfile") {
+      description = "This task creates the Chrome 'First Run' file that prevents Chrome from issuing the first run interface"
+      group = "swingjs-chrometest"
+
+      ext.chromeUserDir = "${j2sBuildDir}/chrome"
+      ext.profileName = "BUILD"
+
+      def firstRun = project.file("${chromeUserDir}/${profileName}/First Run")
+
+      doFirst {
+        firstRun.getParentFile().mkdirs()
+        firstRun.text = ""
+      }
+
+      outputs.file(firstRun)
+    }
+
+    tasks.register("cleanChromeUserDir") {
+      group = "swingjs-chrometest"
+
+      doFirst {
+        delete(tasks.named("chromeProfile").get().chromeUserDir)
+      }
+    }
+
+    tasks.named("chromeProfile") {
+      mustRunAfter("cleanChromeUserDir")
+    }
+
+    tasks.register("chromeSetup") {
+      group = "swingjs-chrometest"
+
+      dependsOn("chromeProfile")
+      dependsOn("copyStderrLaunchTestFile")
+    }
+
+    tasks.register("launchTest") {
+      description = "Check the J2S transpiled app opens in a Chrome browser."
+      group = "swingjs-chrometest"
+      /**
+       * This task uses a ProcessBuilder to run Chrome, instead of using an Exec task.
+       * In macOS the Chrome process doesn't time itself out as requested with --timeout, so an Exec task ends
+       * up timing itself out and considering itself failed.
+       * For non-macOS, the --virtual-time-budget and --timeoutWe work, but spotting the successString early
+       * in a separate executor with recurring scheduled checks cannot end the task early even when throwing
+       * an Exception.
+       * Hence we are using a plain task and our own ProcessBuilder object for all OSes.
+       */
+
+      def chromeBinary = swingjs.chromeBinary.get()
+      if (chromeBinary.startsWith("~/")) {
+        chromeBinary = System.getProperty("user.home") + chromeBinary.substring(1)
+      }
+
+      def timeoutms = Integer.valueOf(20000) // in milliseconds
+
+      def userDataDir = project.file(tasks.named("chromeProfile").get().chromeUserDir).getAbsolutePath()
+      def stderrLaunchTestFile = project.file(tasks.named("copyStderrLaunchTestFile").get().stderrLaunchTestFile).getAbsolutePath()
+      String[] commandLine = [
+        "${chromeBinary}",
+        "--no-sandbox",
+        "--headless=new",
+        "--disable-gpu",
+        "--disable-save-password-bubble",
+        "--disable-features=PasswordManager",
+        "--use-mock-keychain", // needed for macOS
+        "--timeout=${timeoutms}",
+        "--virtual-time-budget=${timeoutms}",
+        "--user-data-dir=${userDataDir}",
+        "--profile-directory=${tasks.named('chromeProfile').get().profileName}",
+        "--allow-file-access-from-files",
+        "--enable-logging=stderr",
+        "file://${stderrLaunchTestFile}"
+      ]
+
+      ProcessBuilder pb = new ProcessBuilder(commandLine)
+      Process process = null
+      BufferedReader reader
+
+      def found = false
+      def foundString = null
+      def executor = Executors.newScheduledThreadPool(3);
+
+      def successString = swingjs.chromeTestOutputString.get()
+      def loggedSuccess = false
+
+      doFirst {
+        def binary = project.file(chromeBinary)
+        if (!binary.exists()) {
+          throw new StopExecutionException("Could not find Chrome binary '${chromeBinary}'. Cannot run task ${name}.")
+        }
+
+        logger.lifecycle("Running command: '" + styler["cyan"](commandLine.join(" ")) + "'")
+
+        pb.redirectErrorStream(true)
+        process = pb.start()
+        reader = new BufferedReader(new InputStreamReader(process.getInputStream()))
+
+        executor.scheduleWithFixedDelay(
+          () -> {
+            def line = null
+            while( (line = reader.readLine()) != null ) {
+              logger.info(line)
+              if (line.contains(successString)) {
+                found = true
+                foundString = line
+                break
+              }
+            }
+
+            if (found) {
+              logger.lifecycle("Found line with '${styler['green'](successString)}' in Chrome output.")
+              loggedSuccess = true
+              process.destroyForcibly()
+              throw new StopActionException("Found string in Chrome output.")
+            }
+          },
+          2000,
+          1000,
+          TimeUnit.MILLISECONDS
+        )
+        executor.schedule(
+          () -> {
+            process.destroyForcibly()
+            if (found) {
+              logger.lifecycle("Found line with '${styler['green'](successString)}' in Chrome output.")
+              throw new StopActionException("Found string in Chrome output.")
+            } else {
+              throw new GradleException("Could not find evidence of J2S application launch in Chrome output.")
+            }
+            executor.shutdownNow()
+          },
+          timeoutms + 1000,
+          TimeUnit.MILLISECONDS
+        )
+        logger.info("Waiting for up to "+(timeoutms+1000)+"ms")
+        process.waitFor(timeoutms + 1000, TimeUnit.MILLISECONDS)
+      }
+
+      doLast {
+        def line = null
+        if (!found) {
+          while( (line = reader.readLine()) != null ) {
+            logger.info(line)
+            if (line.contains(successString)) {
+              found = true
+              foundString = line
+              break
+            }
+          }
+        }
+        if (process.isAlive()) {
+          process.destroyForcibly()
+        }
+        executor.shutdownNow()
+        if (found) {
+          if (!loggedSuccess) {
+            logger.lifecycle("Found line '${styler['green'](successString)}' in Chrome output.")
+          }
+          throw new StopActionException("Found string in output.")
+        } else {
+          logger.warn("Could not find '${styler['magenta'](successString)}' in Chrome output.")
+          throw new GradleException("Could not find evidence of launch in Chrome output.")
+        }
+      }
+
+      timeout = Duration.ofMillis(timeoutms + 8000)
+
+      mustRunAfter("buildSite")
+      dependsOn("chromeSetup")
+    }
+    
+    tasks.register("transpileLaunchTest") {
+      description = "Check the build's J2S transpilation opens in a Chrome browser."
+      group = "swingjs-chrometest"
+      
+      dependsOn("buildSite")
+      dependsOn("launchTest")
+    }
+
+    project.configurations {
+      site
+      siteTar
+    }
+
+    project.artifacts {
+      add("site", tasks.named("buildSite"))
+      add("siteTar", tasks.named("siteTar"))
+    }
+
+
+    /**
+     * These IDE_* tasks are for running in Eclipse IDE GUI.  They are not required to develop the J2S application
+     * in Eclipse but they should be useful.
+     */
+
+    tasks.register("IDE_checkJ2sPlugin") {
+      description = "Compare the swingjs/net.sf.j2s.core-j11.jar file with the Eclipse IDE's plugin version (found in the 'dropins' dir)"
+      group = "00 swingjs-IDE"
+
+      doFirst {
+        runInEclipse(name)
+
+        def j2sPlugin = tasks.named("eclipseCopyDropins").get().j2sPluginJar
+        def j2sPluginFile = project.file(j2sPlugin)
+        def eclipseHome = System.properties["eclipse.home.location"]
+        if (eclipseHome == null || ! inEclipseGui) {
+          throw new StopExecutionException("Cannot find running Eclipse home from System.properties['eclipse.home.location']. Skipping task '${name}'.")
+        }
+        if (eclipseHome.startsWith("file:")) {
+          URL eclipseHomeUrl = new URL(eclipseHome)
+          eclipseHome = eclipseHomeUrl.getPath()
+        }
+        eclipseHome = eclipseHome.replaceAll(~/\/$/, "")
+        def eclipseJ2sPluginDirs = [ "${eclipseHome}/dropins" ]
+        def altPluginsDir = System.properties["org.eclipse.equinox.p2.reconciler.dropins.directory"]
+        if (altPluginsDir != null && project.file(altPluginsDir).exists()) {
+          eclipseJ2sPluginDirs += altPluginsDir
+        }
+        def foundPlugin = false
+        def j2sPluginFileName = j2sPluginFile.getName()
+        def eclipseJ2sPlugin
+        def eclipseJ2sPluginFile
+        eclipseJ2sPluginDirs.any { dir ->
+          eclipseJ2sPlugin = "${dir}/${j2sPluginFileName}"
+          eclipseJ2sPluginFile = project.file(eclipseJ2sPlugin)
+          if (eclipseJ2sPluginFile.exists()) {
+            foundPlugin = true
+            return true
+          }
+        }
+        if (!foundPlugin) {
+          logger.warn("Eclipse IDE J2S Plugin is not installed -- could not find '${j2sPluginFileName}' in\n" + styler['cyan'](eclipseJ2sPluginDirs.join("\n")) + "\nTry running task IDE_copyJ2sPlugin")
+          throw new StopExecutionException("Eclipse IDE J2S Plugin is not installed")
+        }
+
+        def digest = MessageDigest.getInstance("MD5")
+
+        digest.update(j2sPluginFile.text.bytes)
+        def j2sPluginMd5 = new BigInteger(1, digest.digest()).toString(16).padLeft(32, '0')
+
+        digest.update(eclipseJ2sPluginFile.text.bytes)
+        def eclipseJ2sPluginMd5 = new BigInteger(1, digest.digest()).toString(16).padLeft(32, '0')
+
+        if (j2sPluginMd5 != eclipseJ2sPluginMd5) {
+          logger.warn("WARNING! Eclipse J2S Plugin '${styler['magenta'](eclipseJ2sPlugin)}' is different to this branch's version '${styler['cyan'](j2sPlugin)}'")
+          throw new StopExecutionException("Eclipse J2S Plugin is different to this branch's version.")
+        } else {
+          logger.lifecycle("Eclipse J2S Plugin '${styler['green'](eclipseJ2sPlugin)}' is the same as this branch's version '${styler['cyan'](j2sPlugin)}' (this is good)")
+        }
+      }
+    }
+
+    tasks.register("IDE_copyJ2sPlugin") {
+      description = "Copies the java2script jar file into the Eclipse IDE 'dropins' directory"
+      group = "00 swingjs-IDE"
+
+      doFirst {
+        runInEclipse(name)
+
+        def j2sPlugin = tasks.named("eclipseCopyDropins").get().j2sPluginJar
+        def j2sPluginFile = project.file(j2sPlugin)
+        def eclipseHome = System.properties["eclipse.home.location"]
+        if (eclipseHome == null || ! inEclipseGui) {
+          throw new StopExecutionException("Cannot find running Eclipse home from System.properties['eclipse.home.location']. Skipping task '${name}'.")
+        }
+        if (eclipseHome.startsWith("file:")) {
+          URL eclipseHomeUrl = new URL(eclipseHome)
+          eclipseHome = eclipseHomeUrl.getPath()
+        }
+        eclipseHome = eclipseHome.replaceAll(~/\/$/, "")
+        def eclipseJ2sDropinsPlugin = "${eclipseHome}/dropins/${j2sPluginFile.getName()}"
+        def eclipseJ2sDropinsPluginFile = project.file(eclipseJ2sDropinsPlugin)
+
+        logger.warn("${styler['magenta']('WARNING!')} Copying this branch's j2s plugin '${styler['cyan'](j2sPlugin)}'\nto this Eclipse IDE's dropins folder '${styler['cyan'](eclipseJ2sDropinsPlugin)}'\n${styler['magenta']('You may need to restart Eclipse IDE for this to take effect.')}")
+
+        eclipseJ2sDropinsPluginFile.getParentFile().mkdirs()
+        project.copy {
+          from(j2sPluginFile)
+          into(eclipseJ2sDropinsPluginFile.getParent())
+        }
+      }
+
+      mustRunAfter("IDE_checkJ2sPlugin")
+    }
+
+    tasks.register("IDE_deleteJ2sPlugin") {
+      description = "Deletes the java2script jar file in the Eclipse IDE 'dropins' directory.  Use with caution."
+      group = "00 swingjs-IDE"
+
+      doFirst {
+        runInEclipse(name)
+
+        def j2sPlugin = tasks.named("eclipseCopyDropins").get().j2sPluginJar
+        def j2sPluginFile = project.file(j2sPlugin)
+        def j2sPluginFilename = j2sPluginFile.getName()
+        def eclipseHome = System.properties["eclipse.home.location"]
+        if (eclipseHome == null || ! inEclipseGui) {
+          throw new StopExecutionException("Cannot find running Eclipse home from System.properties['eclipse.home.location']. Skipping task '${name}'.")
+        }
+        if (eclipseHome.startsWith("file:")) {
+          URL eclipseHomeUrl = new URL(eclipseHome)
+          eclipseHome = eclipseHomeUrl.getPath()
+        }
+        eclipseHome = eclipseHome.replaceAll(~/\/$/, "")
+        def eclipseJ2sDropinsPlugin = "${eclipseHome}/dropins/${j2sPluginFile.getName()}"
+        def eclipseJ2sDropinsPluginFile = project.file(eclipseJ2sDropinsPlugin)
+
+        if (eclipseJ2sDropinsPluginFile.exists()) {
+          logger.warn("${styler['magenta']('WARNING!')} Deleting the j2s plugin '${styler['cyan'](eclipseJ2sDropinsPlugin)}'\nfrom this Eclipse IDE's dropins folder '${styler['cyan'](eclipseJ2sDropinsPluginFile.getParent())}'\n${styler['magenta']('You may need to restart Eclipse IDE for this to take effect.')}")
+          eclipseJ2sDropinsPluginFile.delete()
+        } else {
+          logger.warn("Could not find the j2s plugin jar file (${styler['magenta'](eclipseJ2sDropinsPluginFile.getName())}) in this Eclipse IDE's dropins folder (${styler['cyan'](eclipseJ2sDropinsPluginFile.getParent())}).")
+        }
+      }
+    }
+
+    tasks.register("IDE_createJ2sFile") {
+      description = "Create the default .j2s file *in the target project* enabling the alternative J2S Config file for headless (or IDE GUI) build by adding the ${j2sAltJ2sFilePropertyName} property (and the ${j2sSiteDirProperty} and ${j2sTemplateHtmlProperty} properties) to the default .j2s file"
+      group = "00 swingjs-IDE"
+
+      doFirst {
+        runInEclipse(name)
+      }
+
+      dependsOn("createJ2sFile")
+    }
+
+    tasks.register("IDE_copyCores") {
+      description = "Build the core js lib closures listed in the classlists dir and publish core html from template"
+      group = "00 swingjs-IDE"
+
+      doFirst {
+        runInEclipse(name)
+      }
+
+      dependsOn("copyCores")
+      dependsOn("copyCoreTemplates")
+    }
+	
+    tasks.register("IDE_copySwingJS") {
+      description = "Copy SwingJS libs and resources to site dir"
+      group = "00 swingjs-IDE"
+
+      doFirst {
+        runInEclipse(name)
+      }
+
+      dependsOn("copySwingJs")
+    }
+
+    tasks.register("IDE_prepareSite") {
+      description = "Copy all libs and resources to site dir, except for closure cores"
+      group = "00 swingjs-IDE"
+
+      doFirst {
+        runInEclipse(name)
+      }
+
+      //dependsOn("copyAppResources") // these should be copied by the net.sf.j2s.core-j11.jar plugin
+      dependsOn("prepareSite")
+    }
+
+    tasks.register("IDE_siteClean") {
+      description = "Deletes the Eclipse and J2S transpiled site"
+      group = "00 swingjs-IDE"
+
+      doFirst {
+        runInEclipse(name)
+      }
+
+      dependsOn("cleanSite")
+    }
+
+    tasks.register("IDE_launchTest") {
+      description = "Runs the Chrome launch test independently of Eclipse IDE"
+      group = "00 swingjs-IDE"
+
+      doFirst {
+        runInEclipse(name)
+      }
+
+      dependsOn("launchTest")
+    }
+
+    tasks.register("IDE_00_Setup_Eclipse") {
+      description = "Run the tasks needed to use this Eclipse IDE with SwingJSPlugin.  May require a restart to take effect."
+      group = "00 swingjs-IDE"
+
+      doFirst {
+        runInEclipse(name)
+      }
+
+      dependsOn("IDE_copyJ2sPlugin")
+      dependsOn("createJ2sFile")
+      dependsOn("IDE_prepareSite")
+    }
+
+    /**
+     * Set
+     *   eclipse {
+     *     synchronizationTasks("${project.path}:eclipseSynchronizationTask")
+     *     autoBuildTasks("${project.path}:eclipseAutoBuildTask")
+     *   }
+     * in the target project's build.gradle (where project.path is the gradle path to the project
+     * with this plugin applied.
+     * synchronizationTasks run when that project is imported or refreshed.
+     * autoBuildTasks run every time a source or resource is updated (when Eclipse builds).
+     * NOTE that autoBuildTasks does not seem to run after a "Project -> Clean...", so a Refresh
+     * is required.
+     */
+    // buildship runs this at project import or refresh, if it's registered
+    tasks.register("eclipseSynchronizationTask") {
+      description = "A task to set in the eclipse { synchronizationTasks( ... ) } extension block"
+      group = "00 swingjs-IDE"
+
+      doFirst {
+        runInEclipse(name)
+        logger.lifecycle("Task ${styler['green'](path)} is executing")
+      }
+
+      dependsOn("IDE_checkJ2sPlugin")
+      dependsOn("createJ2sFile")
+      dependsOn("IDE_prepareSite")
+    }
+
+    // buildship runs this at build time (e.g. resource file save), if it's registered
+    tasks.register("eclipseAutoBuildTask") {
+      description = "A task to set in the eclipse { autoBuildTasks( ... ) } extension block"
+      group = "00 swingjs-IDE"
+
+      doFirst {
+        runInEclipse(name)
+        logger.lifecycle("Task ${styler['green'](path)} is executing")
+      }
+
+      dependsOn("copySwingJs")
+    }
+  }
+}
+
+apply plugin: SwingJSPlugin

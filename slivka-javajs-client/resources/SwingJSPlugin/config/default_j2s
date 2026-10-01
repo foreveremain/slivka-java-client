@@ -1,0 +1,5 @@
+j2s.compiler.status = enable
+j2s.excluded.paths = src/test;resources
+j2s.include.tests = false
+j2s.template.html = resources/SwingJSPlugin/templates/template.html
+

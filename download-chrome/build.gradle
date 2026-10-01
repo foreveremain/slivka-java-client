@@ -1,0 +1,273 @@
+import org.apache.tools.ant.taskdefs.condition.Os
+
+plugins {
+    id("de.undercouch.download") version "5.7.0"
+}
+
+description = 'Download Chrome for Testing'
+
+/**
+ * Although this is modelled on :download-jres, we actually only download only one OS/ARCH combination of Chrome
+ * for use with :jalviewjs build.
+ * We create all OS-ARCH combinations of tasks for testing the URL.
+ */
+
+ext {
+  // our key to Chrome key
+  /**
+   * OS and architecture maps from our keys to Chrome for Testing keys.
+   * See https://www.eclipse.org/downloads/packages/release/2026-03/r and subproject :download-eclipse.
+   */
+  // our key to adoptium key
+  osArchMap = [
+    "LINUX-X64" : "linux64",
+    "MACOS-X64" : "mac-x64",
+    "MACOS-AARCH64" : "mac-arm64",
+    "WINDOWS-X64" : "win64"
+  ]
+
+  // these could be set differently. Using 150.0.7871.24 as it's the latest version at time of writing.
+  chromeVersion = "150.0.7871.24"
+  channel = "Stable" // note capitalisation.  If channel is set then chromeVersion will be overridden
+  
+  /**
+   * To set a native chrome
+   */
+  myOS = null
+  if (Os.isFamily(Os.FAMILY_MAC)) {
+    myOS = "MACOS"
+  }
+  if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+    myOS = "WINDOWS"
+  }
+  if (org.gradle.internal.os.OperatingSystem.current().isLinux()) { // for some reason org.apache.tools.ant.taskdefs.condition.Os doesn't have this check
+    myOS = "LINUX"
+  }
+  myARCH = null
+  String arch = Os.OS_ARCH
+  // A map of possible Os.OS_ARCH values to one of "AARCH64" (arm64) or "X64" (intel64)
+  def archesArchMap = [
+    "aarch64" : "AARCH64",
+    "x86_64" : "X64",
+    "amd64" : "X64"
+  ]
+  myARCH = archesArchMap[arch]
+  myOSARCH = "${myOS}-${myARCH}"
+  myOsArch = osArchMap[myOSARCH]
+  
+  addedNative = false
+
+  nonWritable = false
+
+  chromeUrl = null
+  json = null
+  def jsonUrl = (channel == null) ?
+    "https://googlechromelabs.github.io/chrome-for-testing/${chromeVersion}.json"
+    : "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json"
+  new URL(jsonUrl).withReader { reader ->
+    def slurper = new groovy.json.JsonSlurper()
+    json = slurper.parse(reader)
+  }
+  if (channel != null) {
+    chromeVersion = json.channels."${channel}".version
+  }
+}
+
+configurations {
+  consumable("chromeDownload")
+  consumable("chromeInstallation")
+  consumable("chromeExecutable")
+}
+
+// DELETE THIS TASK AFTER DEBUGGING MORE OS_ARCH VALUES
+tasks.register("osInfo") {
+  description 'Show information about the operating system'
+  doLast {
+    println "Family:       ${Os.OS_NAME}"
+    println "Architecture: ${Os.OS_ARCH}"
+  }
+}
+
+// don't delete these with normal clean task
+tasks.register("reallyclean") {
+  group = "clean"
+  description = "Delete all artifacts including downloads in the build folder."
+
+  doFirst {
+    delete(buildDir)
+  }
+}
+
+// The clean task will delete unpacked chrome dirs
+tasks.register("clean") {}
+
+void createOsArchTasksAndArtifacts(String version, String OSARCH) {
+  def osArch = osArchMap[OSARCH]
+  def (OS, ARCH) = OSARCH.split('-')
+  
+  def chromeBuildDir = "${buildDir}/chrome-${channel}-${version}-${OSARCH}"
+
+  def downloadTask = tasks.register("downloadChromeForTesting-${channel}-${version}-${OSARCH}", Download) {
+    description = "Download Chrome for Testing ${version} (${channel}) for ${OSARCH} (${osArch})"
+    group = "download"
+
+    def archiveName = "chrome-ide-${channel}-${version}-${OSARCH}.zip"
+
+    if (channel != null) {
+      chromeUrl = json.channels."${channel}".downloads.chrome.find { it.platform == osArch }?.url
+    } else {
+      chromeUrl = json.downloads.chrome.find { it.platform == osArch }?.url
+    }
+    src(chromeUrl)
+
+    dest("${chromeBuildDir}/download/${archiveName}")
+
+    doFirst {
+      if(chromeUrl == null) {
+        throw new GradleException("Download URL for Chrome for Testing not found for ${OSARCH} ($osArch).")
+      }
+    }
+    
+    onlyIfModified(true)
+    retries(2)
+    useETag("all")
+  }
+  logger.info("Creating task '${downloadTask.name}'")
+
+  def unpackTask = tasks.register("unpackChromeForTesting-${channel}-${version}-${OSARCH}", Copy) {
+    description = "Unpack Chrome for Testing ${version} for ${OSARCH} (${osArch})"
+    group = "unpack"
+    
+    def myDownload = downloadTask.get().dest
+    def myArchive = zipTree(myDownload)
+    
+    from(myArchive)
+    into("${chromeBuildDir}/unpack")
+
+    doFirst {
+      // set write permission and delete it before unpacking
+      if (destinationDir.exists()) {
+        ant.chmod(dir: destinationDir,
+        //includes: "**/*",
+        perm: "u+w", verbose: true, type: "both")
+        delete(destinationDir)
+      }
+    }
+
+    doLast {
+      /**
+       * We set the unpacked Chrome to be non-writable, since subsequent calls to run this chrome
+       * can alter the installation so that it no longer works with certain plugins.
+       */
+      // chmod -R a-w destinationDir (using ant task as gradle's filePermissions break if dirPermissions are set to a-w).
+      if (nonWritable) {
+        ant.chmod(dir: destinationDir, includes: "**/*", perm: "a-w", verbose: true, type: "both")
+      }
+    }
+
+    dependsOn(downloadTask)
+  }
+  logger.info("Creating task '${unpackTask.name}'")
+
+  tasks.register("clean${unpackTask.name.capitalize()}") {
+    doFirst {
+      // set write permission and delete it before unpacking
+      def destinationDir = unpackTask.get().destinationDir
+      if (destinationDir.exists()) {
+        ant.chmod(
+        dir: destinationDir,
+        //includes: "**/*",
+        perm: "u+w",
+        verbose: true,
+        type: "both"
+        )
+        delete(destinationDir)
+      }
+    }
+  }
+
+  tasks.named("clean") {
+    dependsOn("clean${unpackTask.name.capitalize()}")
+  }
+
+  def setChromeExeTask = tasks.register("setChromeExe-${channel}-${version}-${OSARCH}") {
+    description = "Set the Chrome for Testing executable for ${OSARCH} (${osArch})"
+    group = "executable"
+    
+    def path = unpackTask.get().destinationDir.path + "/chrome-${osArch}"
+    if (OS == "MACOS") {
+      path += "/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"
+    } else if (OS == "WINDOWS") {
+      path += "/chrome.exe"
+    } else {
+      path += "/chrome"
+    }
+
+    ext.chrome = path
+    
+    inputs.dir(unpackTask.get().destinationDir)
+    outputs.file(chrome) // set as an output file for the consumable configuration chromeExecutable-OS-ARCH
+
+    doFirst {
+      if (file(chrome).exists()) {
+        logger.info("Setting Chrome ${version} (${osArch}) executable to '${chrome}'")
+      }
+    }
+
+    dependsOn(unpackTask)
+  }
+  logger.info("Creating task '${setChromeExeTask.name}'")
+
+  if (myOSARCH == OSARCH) {
+    tasks.register("downloadChromeForTesting") {
+      description = "Download Chrome for Testing ${version} for native OS and architecture ${OSARCH} (${osArch})"
+      group = "native"
+
+      dependsOn(downloadTask)
+    }
+
+    tasks.register("unpackChromeForTesting") {
+      description = "Unpack Chrome for Testing ${version} for native OS and architecture ${OSARCH} (${osArch})"
+      group = "native"
+
+      dependsOn(unpackTask)
+    }
+
+    tasks.register("setChromeExe") {
+      description = "Set the Chrome for Testing executable for native OS and architecture ${OSARCH} ($osArch})"
+      group = "native"
+
+      dependsOn(setChromeExeTask)
+    }
+  }
+
+  configurations {
+    // we will only use one of these from jalviewjs depending on the host OS and ARCH
+    consumable("chromeDownload-${OSARCH}")
+    consumable("chromeInstallation-${OSARCH}")
+    consumable("chromeExecutable-${OSARCH}")
+  }
+  
+  artifacts {
+    add("chromeDownload-${OSARCH}", downloadTask)
+    add("chromeInstallation-${OSARCH}", unpackTask.get().destinationDir)
+    add("chromeExecutable-${OSARCH}", setChromeExeTask)
+    if (myOSARCH == OSARCH) {
+      logger.lifecycle("Adding native Chrome for Testing configurations for ${OSARCH} (${osArch})")
+      add("chromeDownload", downloadTask)
+      add("chromeInstallation", unpackTask.get().destinationDir)
+      add("chromeExecutable", setChromeExeTask)
+      addedNative = true
+    }
+  }
+}
+
+// now make the tasks for all OS/ARCH combinations
+osArchMap.keySet().sort().each { OSARCH ->
+  logger.info("Creating ${project.name} tasks for '${OSARCH}'")
+  createOsArchTasksAndArtifacts(chromeVersion, OSARCH)
+}
+
+
+
+

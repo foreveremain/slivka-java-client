@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>SwingJS stroke regression tests</title>
+<script src="swingjs/swingjs2.js"></script>
+</head>
+<body>
+<pre id="result">Running...</pre>
+<script>
+window.console.err = window.console.error.bind(window.console);
+SwingJS.getApplet('strokeTests', {
+  main: 'test.StrokeTest',
+  core: 'NONE',
+  j2sPath: 'swingjs/j2s',
+  console: window.console,
+  width: 1,
+  height: 1
+});
+</script>
+</body>
+</html>

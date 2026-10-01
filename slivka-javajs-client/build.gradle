@@ -1,0 +1,111 @@
+description = "Transpile from jalview-app to jalviewjs using SwingJSPlugin"
+
+apply from: "resources/SwingJSPlugin/SwingJSPlugin.gradle"
+
+configurations {
+	eclipseInstallation
+	chromeExecutable
+}
+
+dependencies {
+	eclipseInstallation(project(path: ":download-eclipse", configuration: "eclipseInstallation"))
+	chromeExecutable(project(path: ":download-chrome", configuration: "chromeExecutable"))
+}
+
+swingjs {
+	// Colour console output styler from https://stackoverflow.com/a/56139852
+	// Use the rootProject property ECLIPSE as the Eclipse installation dir if it has been set,
+	// otherwise we will be downloading one.
+	def eclipseDir = null
+	if (rootProject.ext.eclipseDir != null) {
+		if (file(rootProject.ext.eclipseDir).exists()) {
+			eclipseDir = rootProject.ext.eclipseDir
+		} else {
+			logger.warn("Cannot manually set ECLIPSE to '${styler['red'](rootProject.ext.eclipseDir)}' as it doesn't exist.  Will try and use automatic download.")
+		}
+		// swingjs will set its own eclipseBinary
+	}
+	if (eclipseDir == null) {
+		eclipseDir = configurations.eclipseInstallation.files[0].path
+	}
+	logger.info("Eclipse installation is configured as '${styler['cyan'](eclipseDir)}'.")
+
+	eclipseInstallation = eclipseDir
+
+	eclipseDebug = true
+
+	importPath = rootProject.projectDir.path
+
+	targetProject = rootProject
+
+	//appResources = tasks.named("copyJalviewResources").get().destinationDir.getPath()
+
+	swingjsDir = "resources/SwingJSPlugin/swingjs"
+
+	swingjsResourcesDir = "resources/SwingJSPlugin"
+
+	classlistsDir = "resources/classlists"
+
+	appLibsDir = "resources/libjs"
+
+	javaVersion = Integer.valueOf(rootProject.ext.j2sJavaVersion.toString())
+
+	appName = "slivka-javajs-client" // no spaces
+
+	mainClass = "uk.ac.dundee.compbio.slivkaclient.SlivkaClient"
+
+	archiveFileName = "slivka-javajs-client-site.tar.gz"
+
+	// Use the rootProject property CHROME as the Chrome executable if it has been set,
+	// otherwise we will be downloading one.
+	def chromeExe = null
+	if (rootProject.ext.chromeExe != null) {
+		if (file(rootProject.ext.chromeExe).exists()) {
+			chromeExe = rootProject.ext.chromeExe
+		} else {
+			logger.warn("Cannot manually set CHROME to '${styler['red'](rootProject.ext.chromeExe)}' as it doesn't exist.  Will try and use automatic download.")
+		}
+		// swingjs will set its own chromeBinary
+	}
+	if (chromeExe == null) {
+		chromeExe = configurations.chromeExecutable.files[0].path
+	}
+	chromeBinary = chromeExe
+
+	chromeTestOutputString = "JALVIEWJS: CREATED DESKTOP"
+}
+
+tasks.register("prepareSwingJsTests", Copy) {
+	description = "Prepare manual SwingJS smoke pages in build/swingjs-tests."
+	from(tasks.named("transferUnzipSwingJs"))
+	from("src/test/javascript")
+	into(layout.buildDirectory.dir("swingjs-tests"))
+}
+
+//tasks.named("transferAppResources") {
+//	dependsOn("copyJalviewResources")
+//}
+
+tasks.named("eclipseSetup") {
+	dependsOn(configurations.eclipseInstallation)
+}
+
+tasks.named("chromeSetup") {
+	dependsOn(configurations.chromeExecutable)
+}
+
+//tasks.named("transferOtherSiteFiles") {
+//	into("examples") {
+//		// this is relative to the buildDir/swingjs/transfer/site_otherSiteFiles dir set in SwingJSPlugin:transferOtherSiteFile
+//		from(configurations.examples)
+//	}
+//
+//	dependsOn(configurations.examples)
+//}
+
+/**
+ * SwingJSPlugin creates two consumable configurations:
+ * "site" which contains the j2s `site` folder; and
+ * "siteTar" which contains a compressed tar archive of the `site` folder.
+ */
+

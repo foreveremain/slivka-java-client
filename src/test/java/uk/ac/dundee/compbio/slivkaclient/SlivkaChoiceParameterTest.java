@@ -3,10 +3,10 @@ package uk.ac.dundee.compbio.slivkaclient;
 import org.json.JSONObject;
 import org.testng.annotations.Test;
 
+import uk.ac.dundee.compbio.slivkaclient.Parameter.ChoiceParameter;
+
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
-
-import uk.ac.dundee.compbio.slivkaclient.Parameter.ChoiceParameter;
 
 public class SlivkaChoiceParameterTest
 {

@@ -6,15 +6,19 @@ plugins {
     id 'java-library'
     id 'maven-publish'
 	id 'jacoco'
+	id 'eclipse'
 	id("com.diffplug.spotless") version "8.3.0"
 }
 
-repositories {
-    mavenLocal()
-    maven {
-        url = uri('https://repo.maven.apache.org/maven2/')
-    }
-}
+//repositories {
+//    mavenLocal()
+//    maven {
+//        url = uri('https://repo.maven.apache.org/maven2/')
+//    }
+//	maven {
+//		url = uri("https://maven.hello2morrow.com/repository/")
+//    }
+//}
 
 dependencies {
     api libs.org.apache.httpcomponents.httpclient
@@ -35,6 +39,57 @@ group = 'uk.ac.dundee.compbio'
 version = '0.0.1-SNAPSHOT'
 description = 'A Java Client for Slivka Services'
 java.sourceCompatibility = JavaVersion.VERSION_11
+
+ext {
+  /**
+   * Check to see if we're running in Eclipse/Buildship and/or in headless mode.
+   * :slivka-javajs-client wants to know if we're in Eclipes headlessly.
+   */
+  def val1 = System.properties["eclipse.application"]
+  inEclipse = val1 != null && val1.startsWith("org.eclipse.ui.")
+  
+  styler = 'black red green yellow blue magenta cyan white'.split().toList().withIndex(30).collectEntries { key, val -> [(key) : { "\033[${val}m${it}\033[0m" }] }
+  
+  j2sHeadlessBuildProperty = "net.sf.j2s.core.headlessbuild"
+  inEclipseHeadless = inEclipse && System.properties[j2sHeadlessBuildProperty] == "true"
+  
+  inEclipseGui = inEclipse && !inEclipseHeadless
+
+  if (inEclipse) {
+    logger.info("In Eclipse")
+    if (inEclipseGui) {
+      logger.lifecycle("In Eclipse IDE GUI")
+    } else if (inEclipseHeadless) {
+      logger.lifecycle("In Eclipse Headless Build")
+    }
+  }
+
+  // This is the java version that jalview-app uses when being transpiled by jalviewjs in
+  // a headless eclipse.  It can't be >= 17 so should be 11 or 8
+  j2sJavaVersion = java.sourceCompatibility;
+  if (rootProject.hasProperty("J2S_JAVA_VERSION")) {
+    j2sJavaVersion = J2S_JAVA_VERSION as Integer
+  }
+
+  /**
+   * Helper applications
+   */
+  tildeReplace = { String path -> return path == null ? null : path.replaceFirst("^~/", System.properties.get("user.home") + File.separator) }
+  chromeExe = tildeReplace(rootProject.hasProperty("CHROME") ? CHROME : null) // Can be set in local.properties or with -PCHROME= if not in PATH
+  eclipseDir = tildeReplace(rootProject.hasProperty("ECLIPSE") ? ECLIPSE : null)  // Can be set in local.properties or with -PECLIPSE=...
+  install4jDir = null
+  if (rootProject.hasProperty("INSTALL4JDIR")) {
+    // Can be set in local.properties or with -PINSTALL4JDIR if not in PATH
+    install4jDir = tildeReplace(INSTALL4JDIR)
+  }
+} // ext
+
+tasks.named("wrapper") {
+  // periodically update this (to a version that still works)
+  gradleVersion = "9.4.1"
+  // set this for IDEs
+  distributionType = Wrapper.DistributionType.ALL
+}
 
 //sourceSets {
 //	main.java {}
@@ -81,7 +136,7 @@ spotless {
   //ratchetFrom("development/Release_2_12_Branch")
 
   java {
-	importOrder("java", "javax", "org", "com", "jalview", "\\#" )
+	importOrder("java", "javax", "org", "com", "uk.ac.dundee.compbio", "jalview", "\\#" )
 	removeUnusedImports()
 	eclipse().configFile("resources/eclipse/JalviewCodeStyle.xml")
   }
