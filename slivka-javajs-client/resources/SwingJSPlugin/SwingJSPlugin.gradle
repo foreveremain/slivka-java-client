@@ -1203,6 +1203,7 @@ class SwingJSPlugin implements Plugin<Project> {
 
       mustRunAfter("cleanSite")
       dependsOn("projectTranspile")
+	  dependsOn("copyStderrLaunchTestFile")
     }
 
     tasks.register("copyCores", Copy) {
@@ -1310,7 +1311,19 @@ class SwingJSPlugin implements Plugin<Project> {
       dependsOn("buildSite")
     }
 
-
+	tasks.register("jsLibZip",Zip) {
+		description = "Create a .zip for just the transpiled classes"
+		group = "swingjs"
+  
+		from(tasks.named("buildSite").get().outputs)
+		into("site") // this is inside the tar file
+  
+		archiveFileName = swingjs.archiveFileName.get()+".zip"
+		destinationDirectory = project.file("${j2sBuildDir}/zip")
+		include("**/uk/ac/dundee/compbio/slivkaclient/**")
+		dependsOn("buildSite")
+  
+	}
 
     tasks.register("copyStderrLaunchTestFile", Copy) {
       group = "swingjs-chrometest"
