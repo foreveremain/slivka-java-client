@@ -110,7 +110,7 @@ class SwingJSPlugin implements Plugin<Project> {
 
   private String j2sBuildDirName = "swingjs"
 
-  private String j2sCoreJar = "net.sf.j2s.core-j11.jar"
+  private String j2sCoreJar = "j2s.core.jar"
 
   private boolean inEclipseGui() {
     def eclipseApplicationPropertyVal = System.properties[eclipseApplicationProperty]
@@ -1317,10 +1317,13 @@ class SwingJSPlugin implements Plugin<Project> {
   
 		from(tasks.named("buildSite").get().outputs)
 		into("site") // this is inside the tar file
-  
+		
+		includeEmptyDirs(false)
+		
 		archiveFileName = swingjs.archiveFileName.get()+".zip"
 		destinationDirectory = project.file("${j2sBuildDir}/zip")
 		include("**/uk/ac/dundee/compbio/slivkaclient/**")
+		include("**/javajs/http/**")
 		dependsOn("buildSite")
   
 	}
