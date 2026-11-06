@@ -67,21 +67,21 @@ public class SlivkaFileUploadTests
   public void testFileUuid() throws IOException
   {
     var rf = client.uploadFile(filePath.toFile());
-    assertEquals(rf.getId(), "ar0p2dChCPQCGyZ5");
+    assertEquals(rf.getId(), "au3Z9MYqgTw94Ny2");
   }
 
   @Test
   public void testFileLabel() throws IOException
   {
     var rf = client.uploadFile(filePath.toFile());
-    assertEquals(rf.getLabel(), "uploaded");
+    assertEquals(rf.getLabel(), "filename.txt");
   }
 
   @Test
   public void testFileMediaType() throws IOException
   {
     var rf = client.uploadFile(filePath.toFile());
-    assertEquals(rf.getMediaType(), "");
+    assertEquals(rf.getMediaType(), "text/plain");
   }
 
   @Test

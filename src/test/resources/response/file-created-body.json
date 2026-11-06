@@ -1,9 +1,9 @@
 {
-  "@content": "/media/uploads/ar0p2dChCPQCGyZ5",
-  "@url": "/api/files/ar0p2dChCPQCGyZ5",
-  "id": "ar0p2dChCPQCGyZ5",
+  "@content": "/media/uploads/au3Z9MYqgTw94Ny2",
+  "@url": "/api/files/au3Z9MYqgTw94Ny2",
+  "id": "au3Z9MYqgTw94Ny2",
   "jobId": null,
-  "label": "uploaded",
-  "mediaType": "",
-  "path": "ar0p2dChCPQCGyZ5"
+  "label": "filename.txt",
+  "mediaType": "text/plain",
+  "path": "au3Z9MYqgTw94Ny2"
 }
