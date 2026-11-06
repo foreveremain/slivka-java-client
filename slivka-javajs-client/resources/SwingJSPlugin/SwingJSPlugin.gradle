@@ -861,9 +861,16 @@ class SwingJSPlugin implements Plugin<Project> {
           throw new GradleException("Task ${name} exited with non-zero result.\nSee log file '${logErrFile.getPath()}' for more details.")
         }
         def newJsCount = 0
+	
+        // match on : "J2S buildFinished " + ntotal + " file" + plural(ntotal) + " transpiled"
+	
         logOutFile.eachLine {
-          if (it.contains("J2S transpiling ")) { newJsCount++ }
-        }
+          if (it.contains("J2S buildFinished")) {
+	    def m = (it =~ /J2S buildFinished ([0-9]+)/)
+	    if (m) { newJsCount = m[0][1] as Integer }
+	    }
+          }
+	
         def enough = newJsCount > javaCount * 0.95 // more than 95% of .java souces files have been converted to .js files.  It isn't exact.
         logger.info("There are ${styler['cyan'](newJsCount)} new .js files from ${styler['cyan'](javaCount)} .java files (${styler[enough ? 'green' : 'red'](enough ? 'Enough' : 'Not enough')})")
         if (!enough) {
