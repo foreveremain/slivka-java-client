@@ -583,6 +583,8 @@ class SwingJSPlugin implements Plugin<Project> {
 
       into("${j2sBuildDir}/transfer/site_appLibs")
 
+      duplicatesStrategy = DuplicatesStrategy.INCLUDE
+
       def appLibsFiles = []
       def appLibsDir = swingjs.appLibsDir.getOrNull()
       if (appLibsDir == null) {
